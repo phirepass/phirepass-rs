@@ -71,7 +71,7 @@ async-trait = { workspace = true }
 thiserror = "2.0.18"
 russh = { version =  "0.57.0" }
 russh-sftp = { version = "2.1.1"}
-tokio = { version = "1.49.0", features = ["full"]}
+tokio = { version = "1.50.0", features = ["full"]}
 tokio-util = "0.7.18"
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-webpki-roots"] }
 serde = { version = "1.0.228", features = ["derive"] }
