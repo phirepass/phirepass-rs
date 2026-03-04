@@ -26,13 +26,13 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Install cargo verison
-              uses: dimitrmo/cargo-verison-action@v1.0.41
+              uses: dimitrmo/cargo-verison-action@v1.0.43
               with:
                   workspace: true
                   skip-bump: true
 
             - name: Store binary
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@v7
               with:
                   name: cargo-verison
                   path: ~/.cargo/bin/cargo-verison
@@ -123,7 +123,7 @@ jobs:
               uses: docker/setup-qemu-action@v3
 
             - name: Cargo Verison Setup
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: cargo-verison
                   path: ~/.cargo/bin/
@@ -133,7 +133,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.41
+              uses: dimitrmo/cargo-verison-action@v1.0.43
               with:
                   workspace: true
                   skip-install: true
@@ -174,7 +174,7 @@ jobs:
               uses: actions/checkout@v6
 
             - name: Cargo Verison Setup
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: cargo-verison
                   path: ~/.cargo/bin/
@@ -184,7 +184,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.41
+              uses: dimitrmo/cargo-verison-action@v1.0.43
               with:
                   workspace: true
                   skip-install: true
@@ -228,7 +228,7 @@ jobs:
                   git config user.email "$CARGO_TAG_EMAIL"
 
             - name: Cargo Verison Setup
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: cargo-verison
                   path: ~/.cargo/bin/
@@ -238,7 +238,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.41
+              uses: dimitrmo/cargo-verison-action@v1.0.43
               with:
                   workspace: true
                   skip-install: true

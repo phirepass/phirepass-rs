@@ -15,7 +15,7 @@ env_logger = { workspace = true }
 thread-count = { version = "0.3.1", optional = true }
 anyhow = { workspace = true }
 os_info = { version = "3.14.0", optional = true }
-libc = { version = "0.2.181", optional = true }
+libc = { version = "0.2.182", optional = true }
 netstat2 = { version = "0.11.2", optional = true }
 mac_address = { version = "1.1.8", optional = true }
 bytes = { workspace = true, optional = true }
