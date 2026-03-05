@@ -44,6 +44,11 @@ pub(crate) struct WebSocketConnection {
 }
 
 fn generate_server_endpoint(mode: &Mode, server_host: &String, server_port: u16) -> String {
+    let server_host = server_host
+        .split_once("://")
+        .map(|(_, rest)| rest)
+        .unwrap_or(server_host.as_str());
+
     match mode {
         Mode::Development => {
             if server_port == 80 {

@@ -22,8 +22,8 @@ const tabButtons = document.querySelectorAll(".tab-button");
 
 const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
 
-const wsEndpoint = `${wsScheme}://${window.location.hostname}:8000`;
-const httpEndpoint = `${window.location.protocol}//${window.location.hostname}:8080`;
+const wsEndpoint = `wss://api.phirepass.com`;
+const httpEndpoint = `https://api.phirepass.com`;
 
 let term, fitAddon;
 let socket; // SSH socket
