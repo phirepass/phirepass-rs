@@ -104,6 +104,63 @@ impl WsProxy {
 
         Ok(server)
     }
+
+    async fn handle_healthz(&self, session: &mut Session) -> Result<bool> {
+        debug!("healthz handler");
+
+        let mut header = ResponseHeader::build(200, None)?;
+        header.insert_header("content-length", "0")?;
+
+        session
+            .write_response_header(Box::new(header), true)
+            .await?;
+
+        Ok(true) // stop processing
+    }
+
+    async fn handle_readyz(&self, session: &mut Session) -> Result<bool> {
+        debug!("readyz handler");
+
+        let mut header = ResponseHeader::build(200, None)?;
+        header.insert_header("content-length", "0")?;
+
+        if READY.load(Ordering::Relaxed) {
+            session
+                .write_response_header(Box::new(header), true)
+                .await?;
+        } else {
+            session
+                .respond_error(503)
+                .await?;
+        };
+
+        Ok(true) // stop processing
+    }
+
+    async fn handle_proxy_web_ws(&self, session: &mut Session, ctx: &mut RequestCtx) -> Result<bool> {
+        // Handle ws proxy
+
+        let req = session.req_header();
+        let (node_id, server_id) = extract_protocols(req);
+
+        if node_id.is_none() {
+            warn!("sec-websocket-protocol missing or empty");
+            session.respond_error(400).await?;
+            return Ok(true); // stop processing
+        }
+
+        ctx.node_id = node_id;
+        if let Some(node_id) = ctx.node_id.as_ref() {
+            debug!("node id found: {}", node_id);
+        }
+
+        ctx.server_id = server_id;
+        if let Some(server_id) = ctx.server_id.as_ref() {
+            debug!("server id found: {}", server_id);
+        }
+
+        Ok(false) // proceed further, do not stop
+    }
 }
 
 #[async_trait]
@@ -158,60 +215,21 @@ impl ProxyHttp for WsProxy {
 
         match path {
             "/healthz" => {
-                debug!("healthz handler");
-
-                let mut header = ResponseHeader::build(200, None)?;
-                header.insert_header("content-length", "0")?;
-
-                session
-                    .write_response_header(Box::new(header), true)
-                    .await?;
-
-                return Ok(true);
+                self.handle_healthz(session).await
             },
             "/readyz" => {
-                debug!("readyz handler");
-
-                let mut header = ResponseHeader::build(200, None)?;
-                header.insert_header("content-length", "0")?;
-
-                if READY.load(Ordering::Relaxed) {
-                    session
-                        .write_response_header(Box::new(header), true)
-                        .await?;
-                } else {
-                    session
-                        .respond_error(503)
-                        .await?;
-                };
-
-                return Ok(true); // stop processing
+                self.handle_readyz(session).await
             },
-            _ => {}
+            "/api/web/ws" => {
+                self.handle_proxy_web_ws(session, ctx).await
+            },
+            _ => {
+                session.respond_error(422).await?;
+                Err(Error::new_str("Unprocessable Content"))
+            }
         }
 
-        // Handle ws proxy
 
-        let req = session.req_header();
-        let (node_id, server_id) = extract_protocols(req);
-
-        if node_id.is_none() {
-            warn!("sec-websocket-protocol missing or empty");
-            session.respond_error(400).await?;
-            return Ok(true); // stop processing
-        }
-
-        ctx.node_id = node_id;
-        if let Some(node_id) = ctx.node_id.as_ref() {
-            debug!("node id found: {}", node_id);
-        }
-
-        ctx.server_id = server_id;
-        if let Some(server_id) = ctx.server_id.as_ref() {
-            debug!("server id found: {}", server_id);
-        }
-
-        Ok(false)
     }
 }
 
