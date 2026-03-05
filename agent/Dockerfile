@@ -41,7 +41,7 @@ RUN RUST_TARGET="$(cat /rust_target)" && \
 
 FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 
-ENV RUST_LOG=info
+ENV RUST_LOG=agent=info
 
 COPY --from=builder /app-bin /app/agent
 
