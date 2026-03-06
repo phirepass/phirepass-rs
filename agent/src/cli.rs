@@ -11,13 +11,28 @@ pub(crate) struct Cli {
 #[derive(Subcommand)]
 pub(crate) enum Commands {
     /// Start the agent
-    Start,
+    Start(StartArgs),
     /// Login
     Login(LoginArgs),
     /// Logout and delete node from server
     Logout(LogoutArgs),
     /// Print version information
     Version,
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct StartArgs {
+    /// Read token from a mounted file (recommended for CI/K8s/Docker secrets)
+    #[arg(long, value_name = "PATH")]
+    pub token_from_file: Option<PathBuf>,
+
+    /// Server host to connect to
+    #[arg(long)]
+    pub server_host: Option<String>,
+
+    /// Server port to connect to
+    #[arg(long)]
+    pub server_port: Option<u16>,
 }
 
 #[derive(Args, Debug)]

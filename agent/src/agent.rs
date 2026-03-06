@@ -83,7 +83,15 @@ pub(crate) async fn login(
         rpassword::prompt_password("Enter authentication token: ")?
     };
 
-    info!("token found: {}", mask_after_10(token.as_str()));
+    save_token(server_host, server_port, token.as_str()).await
+}
+
+pub(crate) async fn save_token(
+    server_host: &str,
+    server_port: u16,
+    token: &str,
+) -> anyhow::Result<()> {
+    info!("token found: {}", mask_after_10(token));
 
     let username = whoami::username()?;
     info!("username found: {}", username);

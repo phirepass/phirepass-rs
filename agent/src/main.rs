@@ -1,4 +1,6 @@
+use std::fs;
 use phirepass_common::runtime::RuntimeBuilder;
+use crate::agent::save_token;
 
 mod agent;
 mod cli;
@@ -23,8 +25,20 @@ fn main() -> anyhow::Result<()> {
         let cli = cli::parse();
         phirepass_common::logger::init("phirepass:agent");
         match cli.command {
-            Some(cli::Commands::Start) | None => {
+            None => {
                 let config = env::init()?;
+                agent::start(config).await
+            }
+            Some(cli::Commands::Start(args)) => {
+                let config = env::init()?;
+
+                if let Some(path_to_token) = args.token_from_file {
+                    let server_host = args.server_host.unwrap_or(config.server_host.to_owned());
+                    let server_port = args.server_port.unwrap_or(config.server_port);
+                    let token = fs::read_to_string(path_to_token)?;
+                    save_token(server_host.as_str(), server_port, &token).await?;
+                }
+
                 agent::start(config).await
             }
             Some(cli::Commands::Login(args)) => {

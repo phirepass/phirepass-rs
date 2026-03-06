@@ -39,27 +39,13 @@ RUN RUST_TARGET="$(cat /rust_target)" && \
     cp target/"${RUST_TARGET}"/release/"${APP_NAME}" /app-bin && \
     rm -rf src target/"${RUST_TARGET}"/release/*
 
-FROM debian:trixie-slim as runtime
-
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    htop \
-    btop \
-    locales \
-    curl \
-    jq
-
-RUN sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && locale-gen \
-    && update-locale LANG=en_US.UTF-8
-
-ENV LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+FROM gcr.io/distroless/cc-debian13:nonroot as runtime
 
 ENV RUST_LOG=agent=info
 
 COPY --from=builder /app-bin /app/agent
+
+USER nonroot
 
 ENTRYPOINT ["/app/agent"]
 CMD ["start"]
