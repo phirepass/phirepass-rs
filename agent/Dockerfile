@@ -39,13 +39,21 @@ RUN RUST_TARGET="$(cat /rust_target)" && \
     cp target/"${RUST_TARGET}"/release/"${APP_NAME}" /app-bin && \
     rm -rf src target/"${RUST_TARGET}"/release/*
 
-FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
+FROM debian:trixie-slim as runtime
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    openssh-server \
+    htop \
+    btop \
+    locales \
+    curl \
+    jq
 
 ENV RUST_LOG=agent=info
 
 COPY --from=builder /app-bin /app/agent
-
-USER nonroot
 
 ENTRYPOINT ["/app/agent"]
 CMD ["start"]
