@@ -12,7 +12,7 @@ maintenance = { status = "experimental" }
 members = ["agent", "common", "server", "channel", "relay"]
 
 [workspace.package]
-version = "0.1.139"
+version = "0.1.140"
 edition = "2024"
 repository = "https://github.com/dimitrmo/phirepass-rs"
 license-file = "LICENCE"
