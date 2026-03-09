@@ -21,7 +21,7 @@ pub(crate) struct Env {
     #[envconfig(from = "PING_INTERVAL", default = "30")]
     pub ping_interval: u16,
 
-    #[envconfig(from = "SERVER_HOST", default = "api.phirepass.io")]
+    #[envconfig(from = "SERVER_HOST", default = "api.phirepass.com")]
     pub server_host: String,
 
     #[envconfig(from = "SERVER_PORT", default = "443")]

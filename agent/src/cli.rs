@@ -47,7 +47,7 @@ pub(crate) struct LoginArgs {
 
     /// Server host to connect to
     #[cfg_attr(debug_assertions, arg(long, default_value = "localhost"))]
-    #[cfg_attr(not(debug_assertions), arg(long, default_value = "api.phirepass.io"))]
+    #[cfg_attr(not(debug_assertions), arg(long, default_value = "api.phirepass.com"))]
     pub server_host: String,
 
     /// Server port to connect to
@@ -60,7 +60,7 @@ pub(crate) struct LoginArgs {
 pub(crate) struct LogoutArgs {
     /// Server host to connect to
     #[cfg_attr(debug_assertions, arg(long, default_value = "localhost"))]
-    #[cfg_attr(not(debug_assertions), arg(long, default_value = "api.phirepass.io"))]
+    #[cfg_attr(not(debug_assertions), arg(long, default_value = "api.phirepass.com"))]
     pub server_host: String,
 
     /// Server port to connect to

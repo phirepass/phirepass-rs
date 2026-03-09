@@ -23,14 +23,22 @@ use serde_json::json;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use axum::http::HeaderMap;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
 pub(crate) async fn ws_node_handler(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
+    headers: HeaderMap,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
+    debug!("All websocket headers {:?}", headers);
+    debug!("Client IP {:?}", ip);
+    for (name, value) in headers.iter() {
+        debug!("{}: {:?}", name, value);
+    }
+
     ws.on_upgrade(move |socket| handle_node_socket(socket, state, ip))
 }
 
