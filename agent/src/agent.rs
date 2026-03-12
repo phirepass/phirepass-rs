@@ -140,7 +140,7 @@ pub(crate) async fn save_token(
             .and_then(|v| v.as_str())
             .unwrap_or("authentication failed");
 
-        warn!("authentication failed: {}", error_message);
+        warn!("authentication failed [code={}, message={}]", status, error_message);
 
         let err_lower = error_message.to_ascii_lowercase();
         let should_clear = err_lower.contains("expired")

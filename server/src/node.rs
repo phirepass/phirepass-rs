@@ -592,6 +592,7 @@ pub async fn login_node(
         let node = match state.db.get_node_by_token_id(&token.id).await {
             Ok(record) => record,
             Err(err) => {
+                warn!("error getting node by token id: {err}");
                 return unauthorized(json!({
                     "success": false,
                     "error": err.to_string(),
@@ -600,6 +601,7 @@ pub async fn login_node(
         };
 
         if node.id != node_id {
+            warn!("node_id does not match token");
             return unauthorized(json!({
                 "success": false,
                 "error": "node_id does not match token",
