@@ -26,7 +26,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Install cargo verison
-              uses: dimitrmo/cargo-verison-action@v1.0.43
+              uses: dimitrmo/cargo-verison-action@v1.0.44
               with:
                   workspace: true
                   skip-bump: true
@@ -133,7 +133,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.43
+              uses: dimitrmo/cargo-verison-action@v1.0.44
               with:
                   workspace: true
                   skip-install: true
@@ -184,7 +184,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.43
+              uses: dimitrmo/cargo-verison-action@v1.0.44
               with:
                   workspace: true
                   skip-install: true
@@ -238,7 +238,7 @@ jobs:
 
             - name: Cargo Verison
               id: verison
-              uses: dimitrmo/cargo-verison-action@v1.0.43
+              uses: dimitrmo/cargo-verison-action@v1.0.44
               with:
                   workspace: true
                   skip-install: true
