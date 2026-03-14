@@ -146,10 +146,13 @@ async fn handle_node_socket(socket: WebSocket, state: AppState, ip: IpAddr) {
         }
     };
 
-    let Ok(node_record) = state.db.get_node_by_id(&node_id).await else {
-        warn!("node {node_id} does not exist");
-        let _ = ws_tx.close().await;
-        return;
+    let node_record = match state.db.get_node_by_id(&node_id).await {
+        Ok(node_record) => node_record,
+        Err(err) => {
+            warn!("failed to load node {node_id} after auth: {err}");
+            let _ = ws_tx.close().await;
+            return;
+        }
     };
 
     if let Err(err) = state

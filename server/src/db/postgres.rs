@@ -83,7 +83,7 @@ impl Database {
         let pool = self.ensure_pool().await.context("failed to ensure pool")?;
         let node_record = sqlx::query_as::<_, NodeRecord>(
             r#"
-            SELECT id, user_id, hostname, created_at
+            SELECT id, user_id, name, hostname, created_at
             FROM nodes
             WHERE id = $1
             "#,
