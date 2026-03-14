@@ -28,6 +28,12 @@ Move node authentication to a zero-trust model where:
   - `400` for invalid request payload
   - `401` for credential/scope failures
   - `500` for internal/database claim failures
+- Added anti-enumeration behavior for `/api/nodes/auth/challenge`:
+  - uniform success response for unknown/revoked `node_id`
+  - challenge persistence only for active, non-revoked nodes
+- Added anti-enumeration behavior for `/api/nodes/auth/verify`:
+  - uniform `401 authentication failed` response for node/challenge/signature auth failures
+- Operational decision: rate limiting is implemented at the load balancer layer (not in app handlers).
 - Updated agent flow:
   - bootstrap claim with PAT
   - local keypair persistence
@@ -42,8 +48,7 @@ Move node authentication to a zero-trust model where:
 
 ## What Still Needs To Be Done
 - Security hardening:
-  - Add rate limiting / abuse controls for challenge endpoint.
-  - Consider anti-enumeration behavior for auth challenge requests.
+  - Validate and monitor LB rate-limit rules in production metrics/logging.
 - Documentation updates beyond schema:
   - Update README sections that still describe legacy auth behavior.
   - Add explicit end-to-end testing docs for claim/challenge/verify/ws.

@@ -187,6 +187,28 @@ impl Database {
         Ok(node_record)
     }
 
+    pub async fn get_node_claim_by_id_optional(
+        &self,
+        node_id: &Uuid,
+    ) -> anyhow::Result<Option<NodeClaimRecord>> {
+        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
+
+        let node_record = sqlx::query_as::<_, NodeClaimRecord>(
+            r#"
+            SELECT id, user_id, public_key, hostname, metadata, created_at, last_seen, revoked
+            FROM nodes
+            WHERE id = $1
+            "#,
+        )
+        .persistent(false)
+        .bind(node_id)
+        .fetch_optional(&pool)
+        .await
+        .context("failed to retrieve node claim by id")?;
+
+        Ok(node_record)
+    }
+
     pub async fn upsert_auth_challenge(
         &self,
         node_id: &Uuid,

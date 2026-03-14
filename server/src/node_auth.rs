@@ -55,38 +55,39 @@ pub async fn create_auth_challenge(
     State(state): State<AppState>,
     Json(payload): Json<ChallengeRequest>,
 ) -> Response {
-    let node = match state.db.get_node_claim_by_id(&payload.node_id).await {
+    let challenge = generate_challenge();
+
+    let maybe_node = match state
+        .db
+        .get_node_claim_by_id_optional(&payload.node_id)
+        .await
+    {
         Ok(node) => node,
         Err(_) => {
             return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"success": false, "error": "node not found"})),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"success": false, "error": "failed to create challenge"})),
             )
                 .into_response();
         }
     };
 
-    if node.revoked {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"success": false, "error": "node is revoked"})),
-        )
-            .into_response();
-    }
+    if let Some(node) = maybe_node {
+        if !node.revoked {
+            let expires_at = Utc::now() + Duration::seconds(state.env.node_challenge_ttl_secs);
 
-    let challenge = generate_challenge();
-    let expires_at = Utc::now() + Duration::seconds(state.env.node_challenge_ttl_secs);
-
-    if let Err(err) = state
-        .db
-        .upsert_auth_challenge(&node.id, &challenge, expires_at)
-        .await
-    {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"success": false, "error": err.to_string()})),
-        )
-            .into_response();
+            if let Err(_) = state
+                .db
+                .upsert_auth_challenge(&node.id, &challenge, expires_at)
+                .await
+            {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"success": false, "error": "failed to create challenge"})),
+                )
+                    .into_response();
+            }
+        }
     }
 
     (StatusCode::OK, Json(json!(ChallengeResponse { challenge }))).into_response()
@@ -96,23 +97,23 @@ pub async fn verify_auth_challenge(
     State(state): State<AppState>,
     Json(payload): Json<VerifyRequest>,
 ) -> Response {
+    let unauthorized_verify = || {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"success": false, "error": "authentication failed"})),
+        )
+            .into_response()
+    };
+
     let node = match state.db.get_node_claim_by_id(&payload.node_id).await {
         Ok(node) => node,
         Err(_) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(json!({"success": false, "error": "node not found"})),
-            )
-                .into_response();
+            return unauthorized_verify();
         }
     };
 
     if node.revoked {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({"success": false, "error": "node is revoked"})),
-        )
-            .into_response();
+        return unauthorized_verify();
     }
 
     let challenge_record = match state
@@ -122,11 +123,7 @@ pub async fn verify_auth_challenge(
     {
         Ok(Some(record)) => record,
         Ok(None) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({"success": false, "error": "invalid challenge"})),
-            )
-                .into_response();
+            return unauthorized_verify();
         }
         Err(err) => {
             return (
@@ -151,11 +148,7 @@ pub async fn verify_auth_challenge(
     }
 
     if challenge_record.expires_at <= Utc::now() {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"success": false, "error": "challenge expired"})),
-        )
-            .into_response();
+        return unauthorized_verify();
     }
 
     if let Err(err) = verify_signature(
@@ -163,11 +156,8 @@ pub async fn verify_auth_challenge(
         payload.challenge.trim(),
         payload.signature.trim(),
     ) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"success": false, "error": err.to_string()})),
-        )
-            .into_response();
+        let _ = err;
+        return unauthorized_verify();
     }
 
     let (access_token, expires_at) = match issue_node_jwt(&state.env, payload.node_id) {

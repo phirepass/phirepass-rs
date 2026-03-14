@@ -91,6 +91,7 @@ By default, the container runs `login --from-stdin`, which reads the PAT and the
 
 - Node runtime authentication is challenge-response with short-lived JWT; websocket auth requires a valid node JWT.
 - Node identity metadata/challenges are persisted in Postgres; connection presence is tracked in memory/Redis.
+- Rate limiting for `/api/nodes/claim`, `/api/nodes/auth/challenge`, and `/api/nodes/auth/verify` is enforced at the load balancer layer.
 - Open tasks live in `TASKS.md` (UI, OAuth device flow, PAT revocation, packaging).
 
 ## Directory map
