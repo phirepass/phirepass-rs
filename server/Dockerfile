@@ -39,7 +39,7 @@ RUN RUST_TARGET="$(cat /rust_target)" && \
     cp target/"${RUST_TARGET}"/release/"${APP_NAME}" /app-bin && \
     rm -rf src target/"${RUST_TARGET}"/release/*
 
-FROM gcr.io/distroless/cc-debian13:nonroot as runtime
+FROM gcr.io/distroless/cc-debian13:nonroot AS runtime
 
 ENV RUST_LOG=server=info
 
