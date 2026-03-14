@@ -34,7 +34,10 @@ impl TokenStore {
         let dir = proj.data_local_dir();
         fs::create_dir_all(dir)?;
 
-        debug!("creating identity store in {}", dir.join("state.json").display());
+        debug!(
+            "creating identity store in {}",
+            dir.join("state.json").display()
+        );
 
         Ok(Self {
             service: service.to_string(),

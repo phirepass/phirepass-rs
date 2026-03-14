@@ -1,6 +1,6 @@
-use crate::db::common::NodeRecord;
-use crate::db::common::NodeClaimRecord;
 use crate::db::common::AuthChallengeRecord;
+use crate::db::common::NodeClaimRecord;
+use crate::db::common::NodeRecord;
 use crate::db::common::TokenRecord;
 use crate::env::Env;
 use anyhow::Context;

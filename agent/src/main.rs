@@ -1,6 +1,6 @@
-use std::fs;
-use phirepass_common::runtime::RuntimeBuilder;
 use crate::agent::save_token;
+use phirepass_common::runtime::RuntimeBuilder;
+use std::fs;
 
 mod agent;
 mod cli;

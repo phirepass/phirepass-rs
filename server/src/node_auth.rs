@@ -89,11 +89,7 @@ pub async fn create_auth_challenge(
             .into_response();
     }
 
-    (
-        StatusCode::OK,
-        Json(json!(ChallengeResponse { challenge })),
-    )
-        .into_response()
+    (StatusCode::OK, Json(json!(ChallengeResponse { challenge }))).into_response()
 }
 
 pub async fn verify_auth_challenge(
@@ -292,10 +288,10 @@ fn verify_signature(public_key: &str, challenge: &str, signature: &str) -> anyho
         .try_into()
         .map_err(|_| anyhow::anyhow!("public key must decode to 32 bytes"))?;
 
-    let verifying_key = VerifyingKey::from_bytes(&pk)
-        .map_err(|_| anyhow::anyhow!("invalid ed25519 public key"))?;
-    let signature = Signature::from_slice(&sig)
-        .map_err(|_| anyhow::anyhow!("invalid ed25519 signature"))?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&pk).map_err(|_| anyhow::anyhow!("invalid ed25519 public key"))?;
+    let signature =
+        Signature::from_slice(&sig).map_err(|_| anyhow::anyhow!("invalid ed25519 signature"))?;
 
     verifying_key
         .verify(challenge.as_bytes(), &signature)

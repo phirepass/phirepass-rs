@@ -20,10 +20,7 @@ pub fn resolve_client_ip(headers: &HeaderMap, fallback: IpAddr) -> IpAddr {
 fn parse_x_forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {
     let value = headers.get("x-forwarded-for")?.to_str().ok()?;
 
-    value
-        .split(',')
-        .map(str::trim)
-        .find_map(parse_ip_token)
+    value.split(',').map(str::trim).find_map(parse_ip_token)
 }
 
 fn parse_forwarded_for(headers: &HeaderMap) -> Option<IpAddr> {

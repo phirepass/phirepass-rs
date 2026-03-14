@@ -119,7 +119,9 @@ pub(crate) async fn logout(server_host: String, server_port: u16) -> anyhow::Res
     let _ = server_port;
 
     let ts = TokenStore::new("phirepass", "agent", server_host.as_str())?;
-    let _ = ts.load().context("no active login found - please login first")?;
+    let _ = ts
+        .load()
+        .context("no active login found - please login first")?;
 
     ts.delete().context("failed to delete local identity")?;
     info!("local identity deleted");
@@ -135,7 +137,9 @@ fn start_http_server(
     let host = format!("{}:{}", state.env.host, state.env.port);
 
     tokio::spawn(async move {
-        let app = Router::new().route("/version", get(get_version)).with_state(state);
+        let app = Router::new()
+            .route("/version", get(get_version))
+            .with_state(state);
 
         let listener = tokio::net::TcpListener::bind(host).await.unwrap();
         info!("listening on: {}", listener.local_addr().unwrap());
@@ -268,7 +272,11 @@ fn generate_http_endpoint(server_host: &str, server_port: u16) -> String {
     }
 }
 
-async fn bootstrap_identity(server_host: &str, server_port: u16, pat_token: &str) -> anyhow::Result<()> {
+async fn bootstrap_identity(
+    server_host: &str,
+    server_port: u16,
+    pat_token: &str,
+) -> anyhow::Result<()> {
     info!("token found: {}", mask_after_10(pat_token));
 
     let username = whoami::username()?;
@@ -298,7 +306,10 @@ async fn bootstrap_identity(server_host: &str, server_port: u16, pat_token: &str
     ts.save_identity(claim.node_id, identity.private_key, identity.public_key)
         .context("failed to persist local node identity")?;
 
-    info!("node identity bootstrap complete; node_id={}", claim.node_id);
+    info!(
+        "node identity bootstrap complete; node_id={}",
+        claim.node_id
+    );
     Ok(())
 }
 
@@ -347,12 +358,7 @@ async fn post_with_pat<T: for<'de> Deserialize<'de>>(
     pat: &str,
     body: &serde_json::Value,
 ) -> anyhow::Result<T> {
-    let response = client
-        .post(url)
-        .bearer_auth(pat)
-        .json(body)
-        .send()
-        .await?;
+    let response = client.post(url).bearer_auth(pat).json(body).send().await?;
 
     parse_json_response(response).await
 }
