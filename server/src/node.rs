@@ -601,6 +601,7 @@ pub async fn claim_node(
     if payload.public_key.trim().is_empty() {
         return bad_request(json!({
             "success": false,
+            "code": "BAD_REQUEST_PUBLIC_KEY_REQUIRED",
             "error": "public_key is required",
         }));
     }
@@ -608,6 +609,7 @@ pub async fn claim_node(
     if payload.hostname.trim().is_empty() {
         return bad_request(json!({
             "success": false,
+            "code": "BAD_REQUEST_HOSTNAME_REQUIRED",
             "error": "hostname is required",
         }));
     }
@@ -617,6 +619,7 @@ pub async fn claim_node(
         Err(err) => {
             return unauthorized(json!({
                 "success": false,
+                "code": "AUTH_HEADER_INVALID",
                 "error": err.to_string(),
             }));
         }
@@ -627,6 +630,7 @@ pub async fn claim_node(
         Err(err) => {
             return unauthorized(json!({
                 "success": false,
+                "code": "AUTH_TOKEN_FORMAT_INVALID",
                 "error": err.to_string(),
             }));
         }
@@ -637,12 +641,14 @@ pub async fn claim_node(
         Err(CredentialValidationError::Unauthorized(err)) => {
             return unauthorized(json!({
                 "success": false,
+                "code": "AUTH_TOKEN_UNAUTHORIZED",
                 "error": err,
             }));
         }
         Err(CredentialValidationError::Internal(err)) => {
             return internal_error(json!({
                 "success": false,
+                "code": "AUTH_TOKEN_VALIDATION_FAILED",
                 "error": err,
             }));
         }
@@ -651,6 +657,7 @@ pub async fn claim_node(
     if !token.scopes.iter().any(|scope| scope == "server:register") {
         return unauthorized(json!({
             "success": false,
+            "code": "AUTH_SCOPE_MISSING",
             "error": "missing required scope: server:register",
         }));
     }
@@ -665,6 +672,7 @@ pub async fn claim_node(
             warn!("failed to query node by public key: {err}");
             return internal_error(json!({
                 "success": false,
+                "code": "CLAIM_LOOKUP_FAILED",
                 "error": "failed to check node claim",
             }));
         }
@@ -672,6 +680,7 @@ pub async fn claim_node(
         if existing.user_id != token.user_id {
             return unauthorized(json!({
                 "success": false,
+                "code": "CLAIM_PUBLIC_KEY_OWNERSHIP_CONFLICT",
                 "error": "public key already claimed by another user",
             }));
         }
@@ -692,6 +701,7 @@ pub async fn claim_node(
             warn!("failed to claim node: {err}");
             return internal_error(json!({
                 "success": false,
+                "code": "CLAIM_WRITE_FAILED",
                 "error": "failed to claim node",
             }));
         }

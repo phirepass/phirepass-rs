@@ -1,5 +1,6 @@
 use crate::env::Env;
 use crate::http::AppState;
+use crate::db::postgres::Database;
 use axum::Json;
 use axum::extract::{Extension, Request, State};
 use axum::http::StatusCode;
@@ -66,7 +67,11 @@ pub async fn create_auth_challenge(
         Err(_) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"success": false, "error": "failed to create challenge"})),
+                Json(json!({
+                    "success": false,
+                    "code": "CHALLENGE_LOOKUP_FAILED",
+                    "error": "failed to create challenge"
+                })),
             )
                 .into_response();
         }
@@ -83,7 +88,11 @@ pub async fn create_auth_challenge(
             {
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"success": false, "error": "failed to create challenge"})),
+                    Json(json!({
+                        "success": false,
+                        "code": "CHALLENGE_WRITE_FAILED",
+                        "error": "failed to create challenge"
+                    })),
                 )
                     .into_response();
             }
@@ -100,7 +109,11 @@ pub async fn verify_auth_challenge(
     let unauthorized_verify = || {
         (
             StatusCode::UNAUTHORIZED,
-            Json(json!({"success": false, "error": "authentication failed"})),
+            Json(json!({
+                "success": false,
+                "code": "AUTH_VERIFY_FAILED",
+                "error": "authentication failed"
+            })),
         )
             .into_response()
     };
@@ -128,7 +141,11 @@ pub async fn verify_auth_challenge(
         Err(err) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"success": false, "error": err.to_string()})),
+                Json(json!({
+                    "success": false,
+                    "code": "AUTH_CHALLENGE_LOOKUP_FAILED",
+                    "error": err.to_string()
+                })),
             )
                 .into_response();
         }
@@ -142,7 +159,11 @@ pub async fn verify_auth_challenge(
     {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"success": false, "error": err.to_string()})),
+            Json(json!({
+                "success": false,
+                "code": "AUTH_CHALLENGE_CONSUME_FAILED",
+                "error": err.to_string()
+            })),
         )
             .into_response();
     }
@@ -165,7 +186,11 @@ pub async fn verify_auth_challenge(
         Err(err) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"success": false, "error": err.to_string()})),
+                Json(json!({
+                    "success": false,
+                    "code": "AUTH_JWT_ISSUE_FAILED",
+                    "error": err.to_string()
+                })),
             )
                 .into_response();
         }
@@ -239,18 +264,26 @@ pub async fn authenticate_node_jwt(
     state: &AppState,
     token: &str,
 ) -> anyhow::Result<AuthenticatedNode> {
+    authenticate_node_jwt_with(state.db.as_ref(), state.env.as_ref(), token).await
+}
+
+async fn authenticate_node_jwt_with(
+    db: &Database,
+    env: &Env,
+    token: &str,
+) -> anyhow::Result<AuthenticatedNode> {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.validate_exp = true;
     validation.required_spec_claims = ["exp".to_string()].into();
 
     let claims = decode::<NodeJwtClaims>(
         token,
-        &DecodingKey::from_secret(state.env.node_jwt_secret.as_bytes()),
+        &DecodingKey::from_secret(env.node_jwt_secret.as_bytes()),
         &validation,
     )?
     .claims;
 
-    let node = state.db.get_node_claim_by_id(&claims.node_id).await?;
+    let node = db.get_node_claim_by_id(&claims.node_id).await?;
     if node.revoked {
         anyhow::bail!("node is revoked")
     }
