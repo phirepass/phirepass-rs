@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -27,4 +28,17 @@ impl NodeRecord {
     pub fn to_json(&self) -> anyhow::Result<String> {
         serde_json::to_string(self).map_err(|e| e.into())
     }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)]
+pub struct NodeClaimRecord {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub public_key: String,
+    pub hostname: String,
+    pub metadata: Value,
+    pub created_at: DateTime<Utc>,
+    pub last_seen: Option<DateTime<Utc>>,
+    pub revoked: bool,
 }

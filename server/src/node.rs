@@ -25,6 +25,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use axum::http::HeaderMap;
+use serde_json::Value;
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
@@ -492,6 +493,18 @@ pub struct AuthRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ClaimNodeRequest {
+    pub public_key: String,
+    pub hostname: String,
+    #[serde(default = "default_metadata")]
+    pub metadata: Value,
+}
+
+fn default_metadata() -> Value {
+    Value::Object(Default::default())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct AuthResponse {
     pub node_id: String,
@@ -504,6 +517,27 @@ fn unauthorized(value: serde_json::Value) -> Response {
 
 fn success(value: serde_json::Value) -> Response {
     (StatusCode::OK, Json(value)).into_response()
+}
+
+fn extract_bearer_token(headers: &HeaderMap) -> anyhow::Result<String> {
+    let header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .ok_or_else(|| anyhow::anyhow!("missing authorization header"))?;
+
+    let header = header
+        .to_str()
+        .map_err(|_| anyhow::anyhow!("invalid authorization header"))?;
+
+    let token = header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| anyhow::anyhow!("expected Bearer token"))?
+        .trim();
+
+    if token.is_empty() {
+        anyhow::bail!("bearer token is empty")
+    }
+
+    Ok(token.to_string())
 }
 
 async fn validate_creds(
@@ -553,6 +587,109 @@ async fn validate_creds(
     debug!("password verified successfully");
 
     Ok(token_record)
+}
+
+pub async fn claim_node(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<ClaimNodeRequest>,
+) -> impl IntoResponse {
+    if payload.public_key.trim().is_empty() {
+        return unauthorized(json!({
+            "success": false,
+            "error": "public_key is required",
+        }));
+    }
+
+    if payload.hostname.trim().is_empty() {
+        return unauthorized(json!({
+            "success": false,
+            "error": "hostname is required",
+        }));
+    }
+
+    let bearer = match extract_bearer_token(&headers) {
+        Ok(token) => token,
+        Err(err) => {
+            return unauthorized(json!({
+                "success": false,
+                "error": err.to_string(),
+            }));
+        }
+    };
+
+    let (token_id, token_secret) = match extract_creds(bearer) {
+        Ok(parts) => parts,
+        Err(err) => {
+            return unauthorized(json!({
+                "success": false,
+                "error": err.to_string(),
+            }));
+        }
+    };
+
+    let token = match validate_creds(state.db.clone(), token_id, token_secret).await {
+        Ok(token) => token,
+        Err(err) => {
+            return unauthorized(json!({
+                "success": false,
+                "error": err.to_string(),
+            }));
+        }
+    };
+
+    if !token.scopes.iter().any(|scope| scope == "server:register") {
+        return unauthorized(json!({
+            "success": false,
+            "error": "missing required scope: server:register",
+        }));
+    }
+
+    if let Some(existing) = match state
+        .db
+        .get_node_by_public_key(payload.public_key.trim())
+        .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            return unauthorized(json!({
+                "success": false,
+                "error": err.to_string(),
+            }));
+        }
+    } {
+        if existing.user_id != token.user_id {
+            return unauthorized(json!({
+                "success": false,
+                "error": "public key already claimed by another user",
+            }));
+        }
+    }
+
+    let node = match state
+        .db
+        .claim_node_by_public_key(
+            token.user_id,
+            payload.public_key.trim(),
+            payload.hostname.trim(),
+            &payload.metadata,
+        )
+        .await
+    {
+        Ok(node) => node,
+        Err(err) => {
+            warn!("failed to claim node: {err}");
+            return unauthorized(json!({
+                "success": false,
+                "error": err.to_string(),
+            }));
+        }
+    };
+
+    success(json!({
+        "success": true,
+        "node_id": node.id,
+    }))
 }
 
 pub async fn login_node(

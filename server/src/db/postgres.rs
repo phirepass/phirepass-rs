@@ -1,9 +1,11 @@
 use crate::db::common::NodeRecord;
+use crate::db::common::NodeClaimRecord;
 use crate::db::common::TokenRecord;
 use crate::env::Env;
 use anyhow::Context;
 use argon2::Argon2;
 use log::warn;
+use serde_json::Value;
 use sqlx::PgPool;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::str::FromStr;
@@ -183,5 +185,58 @@ impl Database {
         .context("failed to delete node by id")?;
 
         Ok(())
+    }
+
+    pub async fn get_node_by_public_key(
+        &self,
+        public_key: &str,
+    ) -> anyhow::Result<Option<NodeClaimRecord>> {
+        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
+        let node_record = sqlx::query_as::<_, NodeClaimRecord>(
+            r#"
+            SELECT id, user_id, public_key, hostname, metadata, created_at, last_seen, revoked
+            FROM nodes
+            WHERE public_key = $1
+            "#,
+        )
+        .persistent(false)
+        .bind(public_key)
+        .fetch_optional(&pool)
+        .await
+        .context("failed to retrieve node by public key")?;
+
+        Ok(node_record)
+    }
+
+    pub async fn claim_node_by_public_key(
+        &self,
+        user_id: Uuid,
+        public_key: &str,
+        hostname: &str,
+        metadata: &Value,
+    ) -> anyhow::Result<NodeClaimRecord> {
+        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
+
+        let node_record = sqlx::query_as::<_, NodeClaimRecord>(
+            r#"
+            INSERT INTO nodes (user_id, token_id, name, public_key, hostname, metadata)
+            VALUES ($1, NULL, NULL, $2, $3, $4)
+            ON CONFLICT (public_key)
+            DO UPDATE SET
+                hostname = EXCLUDED.hostname,
+                metadata = EXCLUDED.metadata
+            RETURNING id, user_id, public_key, hostname, metadata, created_at, last_seen, revoked
+            "#,
+        )
+        .persistent(false)
+        .bind(user_id)
+        .bind(public_key)
+        .bind(hostname)
+        .bind(metadata)
+        .fetch_one(&pool)
+        .await
+        .context("failed to claim node by public key")?;
+
+        Ok(node_record)
     }
 }

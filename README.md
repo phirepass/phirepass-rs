@@ -130,3 +130,8 @@ CREATE TABLE public.nodes (
   CONSTRAINT nodes_token_id_fkey FOREIGN KEY (token_id) REFERENCES public.pat_tokens(id)
 );
 ```
+
+## Testing
+
+local-test token
+pat_LDCdDUdMfl1D.APfnvMMVZZSj560k-xkiXZ6PObDmt4OIY8dvetLk9JE
