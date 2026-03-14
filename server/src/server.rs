@@ -6,12 +6,13 @@ use crate::db::postgres::Database;
 use crate::db::redis::MemoryDB;
 use crate::env::Env;
 use crate::http::{AppState, READY, build_cors, healthz, list_connections, list_nodes, readiness};
-use crate::node::{claim_node, login_node, logout_node, ws_node_handler};
-use crate::node_auth::{create_auth_challenge, verify_auth_challenge};
+use crate::node::{claim_node, ws_node_handler};
+use crate::node_auth::{create_auth_challenge, heartbeat, require_node_jwt, verify_auth_challenge};
 use crate::web::ws_web_handler;
 use crate::{stun, tasks};
 use anyhow::Context;
 use axum::Router;
+use axum::middleware;
 use axum::routing::{get, post};
 use dashmap::DashMap;
 use log::{info, warn};
@@ -120,8 +121,13 @@ fn start_http_server(
             .route("/api/nodes/claim", post(claim_node))
             .route("/api/nodes/auth/challenge", post(create_auth_challenge))
             .route("/api/nodes/auth/verify", post(verify_auth_challenge))
-            .route("/api/nodes/login", post(login_node))
-            .route("/api/nodes/logout", post(logout_node))
+            .route(
+                "/api/nodes/heartbeat",
+                post(heartbeat).route_layer(middleware::from_fn_with_state(
+                    state.clone(),
+                    require_node_jwt,
+                )),
+            )
             .route("/api/nodes/ws", get(ws_node_handler))
             .route("/api/nodes", get(list_nodes))
             .route("/api/connections", get(list_connections))

@@ -79,44 +79,6 @@ impl Database {
         Ok(new_pool)
     }
 
-    pub async fn create_node_from_token(&self, token: &TokenRecord) -> anyhow::Result<NodeRecord> {
-        let name = format!("node-{}", Uuid::new_v4().to_string()[..8].to_string());
-        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
-        let node_record = sqlx::query_as::<_, NodeRecord>(
-            r#"
-            INSERT INTO nodes (user_id, token_id, name)
-            VALUES ($1, $2, $3)
-            RETURNING *
-            "#,
-        )
-        .persistent(false)
-        .bind(token.user_id)
-        .bind(token.id)
-        .bind(name)
-        .fetch_one(&pool)
-        .await
-        .context("failed to create node from token")?;
-
-        Ok(node_record)
-    }
-
-    pub async fn create_node_from_token_exclusive(
-        &self,
-        token: &TokenRecord,
-    ) -> anyhow::Result<NodeRecord> {
-        if let Ok(existing_node) = self.get_node_by_token_id(&token.id).await {
-            anyhow::bail!(
-                "Token is already in use by node {}. \
-                 Please close the existing connection or logout first before using this token again.",
-                existing_node.id
-            );
-        }
-
-        self.create_node_from_token(token)
-            .await
-            .context("failed to create node from token exclusively")
-    }
-
     pub async fn get_node_by_id(&self, node_id: &Uuid) -> anyhow::Result<NodeRecord> {
         let pool = self.ensure_pool().await.context("failed to ensure pool")?;
         let node_record = sqlx::query_as::<_, NodeRecord>(
@@ -131,24 +93,6 @@ impl Database {
         .fetch_one(&pool)
         .await
         .context("failed to retrieve node by id")?;
-
-        Ok(node_record)
-    }
-
-    pub async fn get_node_by_token_id(&self, token_id: &Uuid) -> anyhow::Result<NodeRecord> {
-        let pool = self.ensure_pool().await?;
-        let node_record = sqlx::query_as::<_, NodeRecord>(
-            r#"
-            SELECT *
-            FROM nodes
-            WHERE token_id = $1
-            "#,
-        )
-        .persistent(false)
-        .bind(token_id)
-        .fetch_one(&pool)
-        .await
-        .context("failed to retrieve node by token id")?;
 
         Ok(node_record)
     }
@@ -169,23 +113,6 @@ impl Database {
         .context("failed to retrieve token by id")?;
 
         Ok(token_record)
-    }
-
-    pub async fn delete_node(&self, node_id: &Uuid) -> anyhow::Result<()> {
-        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
-        sqlx::query(
-            r#"
-            DELETE FROM nodes
-            WHERE id = $1
-            "#,
-        )
-        .persistent(false)
-        .bind(node_id)
-        .execute(&pool)
-        .await
-        .context("failed to delete node by id")?;
-
-        Ok(())
     }
 
     pub async fn get_node_by_public_key(
@@ -332,6 +259,25 @@ impl Database {
         .execute(&pool)
         .await
         .context("failed to consume auth challenge")?;
+
+        Ok(())
+    }
+
+    pub async fn touch_node_last_seen(&self, node_id: &Uuid) -> anyhow::Result<()> {
+        let pool = self.ensure_pool().await.context("failed to ensure pool")?;
+
+        sqlx::query(
+            r#"
+            UPDATE nodes
+            SET last_seen = NOW()
+            WHERE id = $1
+            "#,
+        )
+        .persistent(false)
+        .bind(node_id)
+        .execute(&pool)
+        .await
+        .context("failed to update node last_seen")?;
 
         Ok(())
     }

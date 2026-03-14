@@ -3,6 +3,7 @@ use crate::db::common::TokenRecord;
 use crate::db::postgres::Database;
 use crate::env;
 use crate::http::AppState;
+use crate::node_auth::authenticate_node_jwt;
 use argon2::{PasswordHash, PasswordVerifier};
 use axum::Json;
 use axum::extract::ws::{Message, WebSocket};
@@ -49,7 +50,7 @@ pub(crate) async fn ws_node_handler(
 async fn wait_for_auth(
     ws_rx: &mut futures_util::stream::SplitStream<WebSocket>,
     tx: &mpsc::Sender<NodeFrameData>,
-    db: Arc<Database>,
+    state: &AppState,
     _ip: IpAddr,
 ) -> anyhow::Result<Uuid> {
     // Wait for the first message which must be Auth
@@ -89,19 +90,15 @@ async fn wait_for_auth(
             let mut correct_node_id = Uuid::nil();
             let mut auth_ok = false;
 
-            if let Ok((token_id, token_secret)) = extract_creds(token) {
-                if let Ok(token) = validate_creds(db.clone(), token_id, token_secret).await {
-                    if let Ok(node_record) = db.get_node_by_token_id(&token.id).await {
-                        correct_node_id = node_record.id;
-                        if node_record.id.eq(&node_id) {
-                            response = Some(NodeFrameData::AuthResponse {
-                                node_id: correct_node_id,
-                                success: true,
-                                version: env::version().to_string(),
-                            });
-                            auth_ok = true;
-                        }
-                    }
+            if let Ok(auth) = authenticate_node_jwt(state, token.as_str()).await {
+                correct_node_id = auth.node_id;
+                if auth.node_id.eq(&node_id) {
+                    response = Some(NodeFrameData::AuthResponse {
+                        node_id: correct_node_id,
+                        success: true,
+                        version: env::version().to_string(),
+                    });
+                    auth_ok = true;
                 }
             }
 
@@ -140,7 +137,7 @@ async fn handle_node_socket(socket: WebSocket, state: AppState, ip: IpAddr) {
     let (tx, mut rx) = mpsc::channel::<NodeFrameData>(256);
 
     // Wait for authentication as the first message
-    let node_id = match wait_for_auth(&mut ws_rx, &tx, state.db.clone(), ip).await {
+    let node_id = match wait_for_auth(&mut ws_rx, &tx, &state, ip).await {
         Ok(node_id) => node_id,
         Err(err) => {
             warn!("authentication failed from {ip}: {err}");
@@ -486,13 +483,6 @@ fn now_millis() -> u64 {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AuthRequest {
-    pub token: String,
-    pub version: String,
-    pub node_id: Option<Uuid>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ClaimNodeRequest {
     pub public_key: String,
     pub hostname: String,
@@ -502,13 +492,6 @@ pub struct ClaimNodeRequest {
 
 fn default_metadata() -> Value {
     Value::Object(Default::default())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct AuthResponse {
-    pub node_id: String,
-    pub success: bool,
 }
 
 fn unauthorized(value: serde_json::Value) -> Response {
@@ -690,157 +673,4 @@ pub async fn claim_node(
         "success": true,
         "node_id": node.id,
     }))
-}
-
-pub async fn login_node(
-    State(state): State<AppState>,
-    Json(payload): Json<AuthRequest>,
-) -> impl IntoResponse {
-    info!(
-        "authenticating node with token version: {}",
-        payload.version
-    );
-
-    let (token_id, token_secret) = match extract_creds(payload.token) {
-        Ok((token_id, token_secret)) => (token_id, token_secret),
-        Err(err) => {
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    info!("credentials extracted [id={}, secret=***]", token_id);
-
-    let token = match validate_creds(state.db.clone(), token_id, token_secret).await {
-        Ok(token) => token,
-        Err(err) => {
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    info!("token ready {}", token.id);
-
-    if let Some(node_id) = payload.node_id {
-        let node = match state.db.get_node_by_token_id(&token.id).await {
-            Ok(record) => record,
-            Err(err) => {
-                warn!("error getting node by token id: {err}");
-                return unauthorized(json!({
-                    "success": false,
-                    "error": err.to_string(),
-                }));
-            }
-        };
-
-        if node.id != node_id {
-            warn!("node_id does not match token");
-            return unauthorized(json!({
-                "success": false,
-                "error": "node_id does not match token",
-            }));
-        }
-
-        info!("node ready {}", node.id);
-
-        return success(json!({
-            "success": true,
-            "node_id": node.id,
-        }));
-    }
-
-    let node = match state.db.create_node_from_token_exclusive(&token).await {
-        Ok(record) => record,
-        Err(err) => {
-            warn!(
-                "failed to create exclusive node for token {}: {}",
-                token.id, err
-            );
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    info!("node ready {}", node.id);
-
-    success(json!({
-        "success": true,
-        "node_id": node.id,
-    }))
-}
-
-#[derive(Deserialize)]
-pub struct LogoutRequest {
-    pub node_id: Uuid,
-    pub token: String,
-}
-
-pub async fn logout_node(
-    State(state): State<AppState>,
-    Json(payload): Json<LogoutRequest>,
-) -> impl IntoResponse {
-    info!("logout request for node {}", payload.node_id);
-
-    // Validate token
-    let (token_id, token_secret) = match extract_creds(payload.token) {
-        Ok((token_id, token_secret)) => (token_id, token_secret),
-        Err(err) => {
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    // Validate credentials
-    let token_record = match validate_creds(state.db.clone(), token_id, token_secret).await {
-        Ok(record) => record,
-        Err(err) => {
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    let node_record = match state.db.get_node_by_token_id(&token_record.id).await {
-        Ok(record) => record,
-        Err(err) => {
-            return unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }));
-        }
-    };
-
-    if node_record.id != payload.node_id {
-        return unauthorized(json!({
-            "success": false,
-            "error": "node_id does not match token",
-        }));
-    }
-
-    // Delete the node
-    match state.db.delete_node(&node_record.id).await {
-        Ok(_) => {
-            info!("node {} successfully deleted", node_record.id);
-            success(json!({
-                "success": true,
-                "message": "Node deleted and token is now available for reuse"
-            }))
-        }
-        Err(err) => {
-            warn!("failed to delete node {}: {}", payload.node_id, err);
-            unauthorized(json!({
-                "success": false,
-                "error": err.to_string(),
-            }))
-        }
-    }
 }

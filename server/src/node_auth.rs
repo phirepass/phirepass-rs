@@ -1,14 +1,15 @@
 use crate::env::Env;
 use crate::http::AppState;
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{Extension, Request, State};
 use axum::http::StatusCode;
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::{Duration, Utc};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use rand::RngCore;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,11 @@ struct NodeJwtClaims {
     node_id: Uuid,
     exp: usize,
     iat: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthenticatedNode {
+    pub node_id: Uuid,
 }
 
 pub async fn create_auth_challenge(
@@ -189,6 +195,85 @@ pub async fn verify_auth_challenge(
         .into_response()
 }
 
+pub async fn heartbeat(
+    State(state): State<AppState>,
+    Extension(auth): Extension<AuthenticatedNode>,
+) -> Response {
+    if let Err(err) = state.db.touch_node_last_seen(&auth.node_id).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"success": false, "error": err.to_string()})),
+        )
+            .into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "success": true,
+            "node_id": auth.node_id,
+            "last_seen": Utc::now(),
+        })),
+    )
+        .into_response()
+}
+
+pub async fn require_node_jwt(
+    State(state): State<AppState>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let token = match extract_bearer_token(request.headers()) {
+        Ok(token) => token,
+        Err(err) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"success": false, "error": err.to_string()})),
+            )
+                .into_response();
+        }
+    };
+
+    let auth = match authenticate_node_jwt(&state, &token).await {
+        Ok(auth) => auth,
+        Err(err) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"success": false, "error": err.to_string()})),
+            )
+                .into_response();
+        }
+    };
+
+    request.extensions_mut().insert(auth);
+    next.run(request).await
+}
+
+pub async fn authenticate_node_jwt(
+    state: &AppState,
+    token: &str,
+) -> anyhow::Result<AuthenticatedNode> {
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_exp = true;
+    validation.required_spec_claims = ["exp".to_string()].into();
+
+    let claims = decode::<NodeJwtClaims>(
+        token,
+        &DecodingKey::from_secret(state.env.node_jwt_secret.as_bytes()),
+        &validation,
+    )?
+    .claims;
+
+    let node = state.db.get_node_claim_by_id(&claims.node_id).await?;
+    if node.revoked {
+        anyhow::bail!("node is revoked")
+    }
+
+    Ok(AuthenticatedNode {
+        node_id: claims.node_id,
+    })
+}
+
 fn generate_challenge() -> String {
     let mut bytes = [0u8; 32];
     OsRng.fill_bytes(&mut bytes);
@@ -234,4 +319,25 @@ fn issue_node_jwt(env: &Env, node_id: Uuid) -> anyhow::Result<(String, chrono::D
     )?;
 
     Ok((token, expires_at))
+}
+
+fn extract_bearer_token(headers: &axum::http::HeaderMap) -> anyhow::Result<String> {
+    let header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .ok_or_else(|| anyhow::anyhow!("missing authorization header"))?;
+
+    let header = header
+        .to_str()
+        .map_err(|_| anyhow::anyhow!("invalid authorization header"))?;
+
+    let token = header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| anyhow::anyhow!("expected Bearer token"))?
+        .trim();
+
+    if token.is_empty() {
+        anyhow::bail!("bearer token is empty")
+    }
+
+    Ok(token.to_string())
 }
