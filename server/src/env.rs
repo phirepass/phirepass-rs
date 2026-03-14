@@ -34,11 +34,11 @@ pub(crate) struct Env {
     #[envconfig(from = "JWT_SECRET")]
     pub jwt_secret: String,
 
-    #[envconfig(from = "NODE_JWT_TTL_SECS", default = "300")]
-    pub node_jwt_ttl_secs: i64,
+    #[envconfig(from = "JWT_TTL_SECS", default = "300")]
+    pub jwt_ttl_secs: i64,
 
-    #[envconfig(from = "NODE_CHALLENGE_TTL_SECS", default = "60")]
-    pub node_challenge_ttl_secs: i64,
+    #[envconfig(from = "CHALLENGE_TTL_SECS", default = "60")]
+    pub challenge_ttl_secs: i64,
 }
 
 pub fn init() -> anyhow::Result<Env> {

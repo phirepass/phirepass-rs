@@ -1,4 +1,3 @@
-use crate::agent::save_token;
 use phirepass_common::runtime::RuntimeBuilder;
 use std::fs;
 
@@ -36,7 +35,7 @@ fn main() -> anyhow::Result<()> {
                     let server_host = args.server_host.unwrap_or(config.server_host.to_owned());
                     let server_port = args.server_port.unwrap_or(config.server_port);
                     let token = fs::read_to_string(path_to_token)?;
-                    save_token(server_host.as_str(), server_port, &token).await?;
+                    agent::save_token(server_host.as_str(), server_port, &token).await?;
                 }
 
                 agent::start(config).await

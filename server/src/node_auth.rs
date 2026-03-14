@@ -79,7 +79,7 @@ pub async fn create_auth_challenge(
 
     if let Some(node) = maybe_node {
         if !node.revoked {
-            let expires_at = Utc::now() + Duration::seconds(state.env.node_challenge_ttl_secs);
+            let expires_at = Utc::now() + Duration::seconds(state.env.challenge_ttl_secs);
 
             if let Err(_) = state
                 .db
@@ -323,7 +323,7 @@ fn verify_signature(public_key: &str, challenge: &str, signature: &str) -> anyho
 
 fn issue_node_jwt(env: &Env, node_id: Uuid) -> anyhow::Result<(String, chrono::DateTime<Utc>)> {
     let iat = Utc::now();
-    let expires_at = iat + Duration::seconds(env.node_jwt_ttl_secs);
+    let expires_at = iat + Duration::seconds(env.jwt_ttl_secs);
 
     let claims = NodeJwtClaims {
         node_id,

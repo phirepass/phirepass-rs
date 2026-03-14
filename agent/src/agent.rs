@@ -8,7 +8,7 @@ use axum::routing::get;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::{Signer, SigningKey};
-use log::{info, warn};
+use log::{debug, info, warn};
 use phirepass_common::stats::Stats;
 use phirepass_common::token::mask_after_10;
 use secrecy::SecretString;
@@ -95,10 +95,15 @@ pub(crate) async fn save_token(
     server_port: u16,
     token: &str,
 ) -> anyhow::Result<()> {
+    info!("saving token for {}:{}", server_host, server_port);
+
     let server_host = server_host
         .split_once("://")
         .map(|(_, rest)| rest)
         .unwrap_or(server_host);
+
+    debug!("token to save: {}", mask_after_10(token));
+    debug!("server host: {}, server port: {}", server_host, server_port);
 
     bootstrap_identity(server_host, server_port, token.trim()).await
 }
