@@ -112,7 +112,7 @@ http = "1.4.0"
 async-trait = "0.1.89"
 base64 = "0.22.1"
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
-jsonwebtoken = "10.3.0"
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 rand = "0.8.5"
 
 [profile.release]
