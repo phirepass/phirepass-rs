@@ -33,6 +33,7 @@ Move node authentication to a zero-trust model where:
   - local keypair persistence
   - runtime challenge signing and JWT retrieval
   - JWT passed in websocket auth frame
+- Added database-side challenge cleanup via Postgres `pg_cron` job.
 
 ## Current State
 - Server and agent compile with the new flow.
@@ -42,7 +43,6 @@ Move node authentication to a zero-trust model where:
 ## What Still Needs To Be Done
 - Security hardening:
   - Add rate limiting / abuse controls for challenge endpoint.
-  - Add challenge cleanup strategy for expired rows (periodic cleanup job).
   - Consider anti-enumeration behavior for auth challenge requests.
 - Documentation updates beyond schema:
   - Update README sections that still describe legacy auth behavior.

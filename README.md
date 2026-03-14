@@ -150,6 +150,14 @@ CREATE TABLE public.auth_challenges (
   CONSTRAINT auth_challenges_pkey PRIMARY KEY (node_id),
   CONSTRAINT auth_challenges_node_id_fkey FOREIGN KEY (node_id) REFERENCES public.nodes(id) ON DELETE CASCADE
 );
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+SELECT cron.schedule(
+           'phirepass-auth-challenge-cleanup',
+           '* * * * *', -- every minute
+           $$DELETE FROM auth_challenges WHERE expires_at <= NOW();$$
+       );
 ```
 
 ## Testing
