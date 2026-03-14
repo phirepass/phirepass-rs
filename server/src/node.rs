@@ -498,6 +498,14 @@ fn unauthorized(value: serde_json::Value) -> Response {
     (StatusCode::UNAUTHORIZED, Json(value)).into_response()
 }
 
+fn bad_request(value: serde_json::Value) -> Response {
+    (StatusCode::BAD_REQUEST, Json(value)).into_response()
+}
+
+fn internal_error(value: serde_json::Value) -> Response {
+    (StatusCode::INTERNAL_SERVER_ERROR, Json(value)).into_response()
+}
+
 fn success(value: serde_json::Value) -> Response {
     (StatusCode::OK, Json(value)).into_response()
 }
@@ -523,18 +531,25 @@ fn extract_bearer_token(headers: &HeaderMap) -> anyhow::Result<String> {
     Ok(token.to_string())
 }
 
+enum CredentialValidationError {
+    Unauthorized(String),
+    Internal(String),
+}
+
 async fn validate_creds(
     db: Arc<Database>,
     token_id: String,
     token_secret: String,
-) -> anyhow::Result<TokenRecord> {
+) -> Result<TokenRecord, CredentialValidationError> {
     info!("validating credentials against postgres");
 
     let token_record = match db.get_token_by_id(token_id.as_str()).await {
         Ok(record) => record,
         Err(err) => {
             warn!("database error while validating token {token_id}: {err}");
-            anyhow::bail!("error while validating token {token_id}")
+            return Err(CredentialValidationError::Internal(
+                "failed to validate token".to_string(),
+            ));
         }
     };
 
@@ -543,7 +558,9 @@ async fn validate_creds(
     if let Some(expires_at) = token_record.expires_at {
         if expires_at < Utc::now() {
             warn!("token {} expired: {:?}", token_id, token_record.expires_at);
-            anyhow::bail!("token has expired")
+            return Err(CredentialValidationError::Unauthorized(
+                "token has expired".to_string(),
+            ));
         }
     }
 
@@ -553,7 +570,9 @@ async fn validate_creds(
         Ok(hash) => hash,
         Err(err) => {
             warn!("failed to parse stored password hash: {}", err);
-            anyhow::bail!("failed to parse stored password hash")
+            return Err(CredentialValidationError::Internal(
+                "failed to parse stored password hash".to_string(),
+            ));
         }
     };
 
@@ -564,7 +583,9 @@ async fn validate_creds(
         .verify_password(token_secret.as_bytes(), &parsed_hash)
     {
         warn!("invalid token secret for token_id={}: {}", token_id, e);
-        anyhow::bail!("failed to verify token")
+        return Err(CredentialValidationError::Unauthorized(
+            "failed to verify token".to_string(),
+        ));
     }
 
     debug!("password verified successfully");
@@ -578,14 +599,14 @@ pub async fn claim_node(
     Json(payload): Json<ClaimNodeRequest>,
 ) -> impl IntoResponse {
     if payload.public_key.trim().is_empty() {
-        return unauthorized(json!({
+        return bad_request(json!({
             "success": false,
             "error": "public_key is required",
         }));
     }
 
     if payload.hostname.trim().is_empty() {
-        return unauthorized(json!({
+        return bad_request(json!({
             "success": false,
             "error": "hostname is required",
         }));
@@ -613,10 +634,16 @@ pub async fn claim_node(
 
     let token = match validate_creds(state.db.clone(), token_id, token_secret).await {
         Ok(token) => token,
-        Err(err) => {
+        Err(CredentialValidationError::Unauthorized(err)) => {
             return unauthorized(json!({
                 "success": false,
-                "error": err.to_string(),
+                "error": err,
+            }));
+        }
+        Err(CredentialValidationError::Internal(err)) => {
+            return internal_error(json!({
+                "success": false,
+                "error": err,
             }));
         }
     };
@@ -635,9 +662,10 @@ pub async fn claim_node(
     {
         Ok(result) => result,
         Err(err) => {
-            return unauthorized(json!({
+            warn!("failed to query node by public key: {err}");
+            return internal_error(json!({
                 "success": false,
-                "error": err.to_string(),
+                "error": "failed to check node claim",
             }));
         }
     } {
@@ -662,9 +690,9 @@ pub async fn claim_node(
         Ok(node) => node,
         Err(err) => {
             warn!("failed to claim node: {err}");
-            return unauthorized(json!({
+            return internal_error(json!({
                 "success": false,
-                "error": err.to_string(),
+                "error": "failed to claim node",
             }));
         }
     };

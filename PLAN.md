@@ -24,6 +24,10 @@ Move node authentication to a zero-trust model where:
   - `0004_drop_legacy_nodes_columns.sql`
 - Removed legacy node columns from `nodes` table (`token_id`, `name`) via migration.
 - Updated server code paths to use current `nodes` schema (not legacy columns).
+- Improved claim endpoint error semantics:
+  - `400` for invalid request payload
+  - `401` for credential/scope failures
+  - `500` for internal/database claim failures
 - Updated agent flow:
   - bootstrap claim with PAT
   - local keypair persistence
@@ -47,7 +51,7 @@ Move node authentication to a zero-trust model where:
   - Add integration tests for claim idempotency and challenge replay prevention.
   - Add regression tests for websocket auth with JWT.
 - Operational polish:
-  - Improve claim failure responses to avoid returning 401 for internal DB errors.
+  - Add request IDs or structured error codes to claim/auth responses for easier debugging.
 
 ## Quick Resume Checklist
 1. Ensure migrations up to `0004` are applied in Postgres.
