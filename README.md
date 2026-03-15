@@ -135,12 +135,13 @@ CREATE TABLE public.pat_tokens (
 CREATE TABLE public.nodes (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
-  public_key text UNIQUE,
+  name text,
+  public_key text NOT NULL UNIQUE,
   hostname text NOT NULL DEFAULT ''::text,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
   last_seen timestamp with time zone,
   revoked boolean NOT NULL DEFAULT false,
-  created_at timestamp with time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
   CONSTRAINT nodes_pkey PRIMARY KEY (id),
   CONSTRAINT nodes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
