@@ -285,7 +285,22 @@ async fn bootstrap_identity(
     info!("token found: {}", mask_after_10(pat_token));
 
     let username = whoami::username()?;
-    let identity = generate_identity();
+    let ts = TokenStore::new("phirepass", "agent", server_host)?;
+
+    // Reuse existing identity for the same server so relogin does not create stale node rows.
+    let identity = match ts.load() {
+        Ok(stored) => {
+            info!("reusing existing local node identity for {}", server_host);
+            LocalIdentity {
+                private_key: stored.private_key,
+                public_key: stored.public_key,
+            }
+        }
+        Err(err) => {
+            info!("no reusable local identity found: {err}; generating a new one");
+            generate_identity()
+        }
+    };
     let hostname = local_hostname();
 
     let client = reqwest::Client::new();
@@ -307,7 +322,6 @@ async fn bootstrap_identity(
     .await
     .context("failed to claim node identity")?;
 
-    let ts = TokenStore::new("phirepass", "agent", server_host)?;
     ts.save_identity(claim.node_id, identity.private_key, identity.public_key)
         .context("failed to persist local node identity")?;
 
