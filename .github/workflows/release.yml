@@ -260,7 +260,7 @@ jobs:
                   git push origin $GIT_BRANCH --tags
 
             - name: Cleanup
-              uses: geekyeggo/delete-artifact@v5
+              uses: geekyeggo/delete-artifact@v6
               with:
                   name: cargo-verison
                   failOnError: false
