@@ -73,7 +73,7 @@ rand = { workspace = true }
 
 [workspace.dependencies]
 thiserror = "2.0.18"
-russh = { version =  "0.57.1" }
+russh = { version =  "0.58.0" }
 russh-sftp = { version = "2.1.1"}
 tokio = { version = "1.50.0", features = ["full"]}
 tokio-util = "0.7.18"
