@@ -416,10 +416,13 @@ async fn handle_message(
             match Protocol::try_from(protocol) {
                 Ok(Protocol::SFTP) => {
                     let auth = match config.ssh_auth_mode {
-                        SSHAuthMethod::Password => {
-                            SFTPConfigAuth::UsernamePassword(username.unwrap(), password.unwrap())
-                        }
-                        SSHAuthMethod::None => SFTPConfigAuth::Username(username.unwrap()),
+                        SSHAuthMethod::Password => SFTPConfigAuth::UsernamePassword(
+                            username.expect("username validated by ensure_credentials"),
+                            password.expect("password validated by ensure_credentials"),
+                        ),
+                        SSHAuthMethod::None => SFTPConfigAuth::Username(
+                            username.expect("username validated by ensure_credentials"),
+                        ),
                     };
 
                     start_sftp_tunnel(
@@ -429,10 +432,13 @@ async fn handle_message(
                 }
                 Ok(Protocol::SSH) => {
                     let auth = match config.ssh_auth_mode {
-                        SSHAuthMethod::Password => {
-                            SSHConfigAuth::UsernamePassword(username.unwrap(), password.unwrap())
-                        }
-                        SSHAuthMethod::None => SSHConfigAuth::Username(username.unwrap()),
+                        SSHAuthMethod::Password => SSHConfigAuth::UsernamePassword(
+                            username.expect("username validated by ensure_credentials"),
+                            password.expect("password validated by ensure_credentials"),
+                        ),
+                        SSHAuthMethod::None => SSHConfigAuth::Username(
+                            username.expect("username validated by ensure_credentials"),
+                        ),
                     };
 
                     start_ssh_tunnel(sender, node_id, cid, config, auth, sessions, msg_id).await;

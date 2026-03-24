@@ -168,11 +168,11 @@ pub async fn list_nodes(State(state): State<AppState>) -> impl IntoResponse {
                 "server_id": info.server_id,
                 "connected_for_secs": now
                     .duration_since(info.node.connected_at)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
                 "since_last_heartbeat_secs": now
                     .duration_since(info.node.last_heartbeat)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
                 "stats": &info.node.last_stats,
             })
@@ -195,11 +195,11 @@ pub async fn list_connections(State(state): State<AppState>) -> impl IntoRespons
                 "ip": info.ip,
                 "connected_for_secs": now
                     .duration_since(info.connected_at)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
                 "since_last_heartbeat_secs": now
                     .duration_since(info.last_heartbeat)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
             })
         })

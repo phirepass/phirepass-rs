@@ -120,7 +120,12 @@ pub(crate) fn print_server_stats_task(state: &AppState) {
     info!("\tactive web connections: {}", state.connections.len());
     info!("\tactive nodes connections: {}", state.nodes.len());
 
-    if log::log_enabled!(Debug) && let Some(stats) = Stats::gather() {
-        debug!("server stats\n{}", stats.log_line());
+    if log::log_enabled!(Debug) {
+        // Stats::gather() calls blocking syscalls (sysinfo, netstat). Use block_in_place so the
+        // async runtime's worker threads are not stalled while waiting for OS data.
+        let stats = tokio::task::block_in_place(Stats::gather);
+        if let Some(stats) = stats {
+            debug!("server stats\n{}", stats.log_line());
+        }
     }
 }

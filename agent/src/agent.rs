@@ -146,10 +146,20 @@ fn start_http_server(
             .route("/version", get(get_version))
             .with_state(state);
 
-        let listener = tokio::net::TcpListener::bind(host).await.unwrap();
-        info!("listening on: {}", listener.local_addr().unwrap());
+        let listener = match tokio::net::TcpListener::bind(host).await {
+            Ok(l) => l,
+            Err(err) => {
+                warn!("failed to bind http listener: {err}");
+                return;
+            }
+        };
 
-        axum::serve(
+        match listener.local_addr() {
+            Ok(addr) => info!("listening on: {}", addr),
+            Err(err) => warn!("could not read local address: {err}"),
+        }
+
+        if let Err(err) = axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
@@ -157,7 +167,9 @@ fn start_http_server(
             let _ = shutdown.recv().await;
         })
         .await
-        .unwrap();
+        {
+            warn!("http server error: {err}");
+        }
     })
 }
 
@@ -424,7 +436,9 @@ fn spawn_stats_logger(
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    match Stats::refresh() {
+                    // Stats::refresh() calls blocking syscalls (sysinfo, netstat). Use
+                    // block_in_place so the async runtime's worker threads are not stalled.
+                    match tokio::task::block_in_place(Stats::refresh) {
                         Some(stats) => info!("agent stats\n{}", stats.log_line()),
                         None => warn!("stats: unable to read process metrics"),
                     }
