@@ -1,25 +1,16 @@
 use crate::db::redis::MemoryDB;
 use crate::env::Env;
 use async_trait::async_trait;
-use dashmap::DashMap;
 use log::{debug, info, warn};
 use phirepass_common::server::ServerIdentifier;
 use pingora::prelude::*;
 use pingora::proxy::{ProxyHttp, Session, http_proxy_service};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
 
 pub static READY: AtomicBool = AtomicBool::new(false);
 
-#[derive(Debug)]
-struct CacheEntry {
-    server: ServerIdentifier,
-    cached_at: Instant,
-}
-
 struct WsProxy {
-    upstream_servers: DashMap<String, CacheEntry>,
     memory_db: Arc<MemoryDB>,
 }
 
@@ -55,7 +46,6 @@ impl WsProxy {
     pub fn new(memory_db: MemoryDB) -> Self {
         Self {
             memory_db: Arc::new(memory_db),
-            upstream_servers: DashMap::new(),
         }
     }
 
@@ -66,27 +56,6 @@ impl WsProxy {
     ) -> anyhow::Result<ServerIdentifier> {
         info!("searching for server by user node {}", node_id);
 
-        let needs_refresh = if let Some(entry) = self.upstream_servers.get(node_id) {
-            debug!("found server entry {:?}", entry);
-            let expired = entry.cached_at.elapsed() >= Duration::from_secs(30);
-            if !expired {
-                debug!(
-                    "server found in upstream cache: {} {:?}",
-                    entry.server.id,
-                    entry.cached_at.elapsed()
-                );
-                return Ok(entry.server.clone());
-            }
-            true
-        } else {
-            info!("server[id={}] not found in cache", node_id);
-            false
-        };
-
-        if needs_refresh {
-            self.upstream_servers.remove(node_id);
-        }
-
         let memory_db = self.memory_db.clone();
         let server_str: String = memory_db
             .get_user_server_by_node_id(node_id, server_id)
@@ -94,15 +63,7 @@ impl WsProxy {
 
         let server = ServerIdentifier::get_decoded(server_str)?;
 
-        self.upstream_servers.insert(
-            node_id.to_string(),
-            CacheEntry {
-                server: server.clone(),
-                cached_at: Instant::now(),
-            },
-        );
-
-        info!("server found: {}", server.id);
+        info!("server found: {} {} {} {}", server.id, server.fqdn, server.private_ip, server.port);
 
         Ok(server)
     }

@@ -3441,7 +3441,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "clap",
- "dashmap",
  "envconfig",
  "futures-util",
  "http",
