@@ -118,9 +118,7 @@ pub(crate) fn print_server_stats_task(state: &AppState) {
     info!("\tactive web connections: {}", state.connections.len());
     info!("\tactive nodes connections: {}", state.nodes.len());
 
-    if log::log_enabled!(Debug) {
-        if let Some(stats) = Stats::gather() {
-            debug!("server stats\n{}", stats.log_line());
-        }
+    if log::log_enabled!(Debug) && let Some(stats) = Stats::gather() {
+        debug!("server stats\n{}", stats.log_line());
     }
 }

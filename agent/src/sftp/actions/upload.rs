@@ -281,7 +281,7 @@ pub async fn upload_file_chunk(
             );
 
             // Apply rate limiting if configured
-            if UPLOAD_CHUNK_ACK_DELAY_MS > 0 {
+            if UPLOAD_CHUNK_ACK_DELAY_MS != 0 {
                 sleep(Duration::from_millis(UPLOAD_CHUNK_ACK_DELAY_MS)).await;
             }
 

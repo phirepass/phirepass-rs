@@ -208,7 +208,7 @@ pub async fn download_file_chunk(
                         );
 
                         // Apply rate limiting if configured
-                        if DOWNLOAD_CHUNK_DELAY_MS > 0 {
+                        if DOWNLOAD_CHUNK_DELAY_MS != 0 {
                             sleep(Duration::from_millis(DOWNLOAD_CHUNK_DELAY_MS)).await;
                         }
 
@@ -268,10 +268,10 @@ pub async fn download_file_chunk(
     }
 
     // Remove the download entry if EOF or error was encountered
-    if should_remove {
-        if let Some((_, file_download)) = downloads.remove(&key) {
-            debug!("closed sftp file for download: {}", file_download.filename);
-            // FileDownload is dropped here, closing the sftp_file
-        }
+    if should_remove
+        && let Some((_, file_download)) = downloads.remove(&key)
+    {
+        debug!("closed sftp file for download: {}", file_download.filename);
+        // FileDownload is dropped here, closing the sftp_file
     }
 }

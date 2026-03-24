@@ -45,7 +45,7 @@ fn extract_protocols(req: &RequestHeader) -> (Option<String>, Option<String>) {
         })
         .unwrap_or_default();
 
-    let node_id = protocols.get(0).cloned();
+    let node_id = protocols.first().cloned();
     let server_id = protocols.get(1).cloned();
 
     (node_id, server_id)
