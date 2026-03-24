@@ -277,7 +277,7 @@ async fn handle_node_messages(
         match msg {
             Message::Close(reason) => {
                 warn!("node connection close message: {:?}", reason);
-                return; // Cleanup handled by caller
+                break; // Cleanup handled by caller
             }
             Message::Binary(data) => {
                 let frame = match Frame::decode(&data) {
@@ -300,12 +300,16 @@ async fn handle_node_messages(
 
                 match node_frame {
                     NodeFrameData::Heartbeat { stats } => {
-                        update_node_heartbeat(&state, &node_id, Some(stats)).await;
+                        if let Err(err) = update_node_heartbeat(&state, &node_id, Some(stats)).await {
+                            warn!("failed to update node heartbeat: {err}");
+                            break;
+                        }
                     }
                     NodeFrameData::Auth { .. } => {
                         warn!(
                             "received Auth message after initial authentication from node {node_id}"
                         );
+                        break;
                     }
                     // ping from agent
                     NodeFrameData::Ping { sent_at } => {
@@ -484,24 +488,20 @@ async fn notify_all_clients_for_closed_tunnel(state: &AppState, id: &Uuid) -> u3
     count
 }
 
-async fn update_node_heartbeat(state: &AppState, node_id: &Uuid, stats: Option<Stats>) {
+async fn update_node_heartbeat(state: &AppState, node_id: &Uuid, stats: Option<Stats>) -> anyhow::Result<()> {
     let mut info = match state.nodes.get_mut(node_id) {
         Some(info) => info,
-        None => {
-            warn!("node {node_id} not found");
-            disconnect_node(&state, node_id).await;
-            return;
-        }
+        None => anyhow::bail!("node {node_id} not found")
     };
 
     let Some(stats) = stats else {
         warn!("node {node_id} stats not found");
-        return;
+        return Ok(());
     };
 
     let Ok(extended_stats) = info.get_extended_stats() else {
         warn!("failed to encode stats");
-        return;
+        return Ok(());
     };
 
     if let Err(err) =
@@ -510,7 +510,7 @@ async fn update_node_heartbeat(state: &AppState, node_id: &Uuid, stats: Option<S
             .update_node_stats(&info.node_record, &state.server, extended_stats)
     {
         warn!("failed to update node stats for node {node_id}: {err}");
-        return;
+        return Ok(());
     };
 
     info!("node {node_id} stats updated");
@@ -535,6 +535,8 @@ async fn update_node_heartbeat(state: &AppState, node_id: &Uuid, stats: Option<S
             );
         }
     };
+
+    Ok(())
 }
 
 fn now_millis() -> u64 {
