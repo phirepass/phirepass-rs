@@ -68,7 +68,7 @@ fn cleanup_dangling_connections(state: &AppState) {
     }
 }
 
-pub(crate) fn refresh_connections_task(state: &AppState) {
+pub(crate) async fn refresh_connections_task(state: &AppState) {
     debug!("refreshing connections tasks");
 
     cleanup_dangling_connections(state);
@@ -79,6 +79,7 @@ pub(crate) fn refresh_connections_task(state: &AppState) {
         if let Err(err) = state
             .memory_db
             .refresh_connection(cid, conn_info.ip, &state.server)
+            .await
         {
             warn!("failed to refresh connection {cid} in redis: {err}");
         } else {
@@ -89,7 +90,7 @@ pub(crate) fn refresh_connections_task(state: &AppState) {
     debug!("refreshed {} connections", refreshed);
 }
 
-pub(crate) fn keep_server_alive_task(state: &AppState) {
+pub(crate) async fn keep_server_alive_task(state: &AppState) {
     debug!("keeping server alive");
 
     let Ok(payload) = state.server.get_encoded() else {
@@ -107,6 +108,7 @@ pub(crate) fn keep_server_alive_task(state: &AppState) {
     if let Err(err) = state
         .memory_db
         .save_server(state.id.as_ref(), payload.as_str(), &stats)
+        .await
     {
         warn!("failed to save server info: {}", err);
     }

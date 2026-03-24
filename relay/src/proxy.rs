@@ -45,7 +45,7 @@ fn extract_protocols(req: &RequestHeader) -> (Option<String>, Option<String>) {
         })
         .unwrap_or_default();
 
-    let node_id = protocols.get(0).cloned();
+    let node_id = protocols.first().cloned();
     let server_id = protocols.get(1).cloned();
 
     (node_id, server_id)
@@ -59,7 +59,7 @@ impl WsProxy {
         }
     }
 
-    fn get_server_by_node_id(
+    async fn get_server_by_node_id(
         &self,
         node_id: &str,
         server_id: Option<&str>,
@@ -87,10 +87,16 @@ impl WsProxy {
             self.upstream_servers.remove(node_id);
         }
 
-        let server = self
-            .memory_db
-            .get_user_server_by_node_id(node_id, server_id)?;
-        let server = ServerIdentifier::get_decoded(server)?;
+        let memory_db = self.memory_db.clone();
+        let node_id_owned = node_id.to_owned();
+        let server_id_owned = server_id.map(ToOwned::to_owned);
+        let server_str: String = tokio::task::spawn_blocking(move || {
+            memory_db.get_user_server_by_node_id(&node_id_owned, server_id_owned.as_deref())
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("redis lookup task failed: {e}"))??;
+
+        let server = ServerIdentifier::get_decoded(server_str)?;
 
         self.upstream_servers.insert(
             node_id.to_string(),
@@ -189,8 +195,8 @@ impl ProxyHttp for WsProxy {
         info!("proxying request for node_id {}", node_id);
 
         let server_with_node = match ctx.server_id {
-            Some(ref server_id) => self.get_server_by_node_id(node_id, Some(server_id)),
-            None => self.get_server_by_node_id(node_id, None),
+            Some(ref server_id) => self.get_server_by_node_id(node_id, Some(server_id)).await,
+            None => self.get_server_by_node_id(node_id, None).await,
         };
 
         let server = match server_with_node {

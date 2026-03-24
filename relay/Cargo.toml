@@ -18,3 +18,4 @@ log = { workspace = true }
 redis = { workspace = true }
 dashmap = { workspace = true }
 bytes = { workspace = true }
+tokio = { workspace = true }

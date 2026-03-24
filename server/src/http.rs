@@ -62,7 +62,7 @@ impl AppState {
         debug!("get_node_id_by_cid_and_sid [cid={cid}, sid={sid}, node_id={node_id})]");
 
         let node_uuid = Uuid::parse_str(&node_id).map_err(|err| {
-            return format!("failed to decode uuid {node_id}: {err}");
+            format!("failed to decode uuid {node_id}: {err}")
         })?;
 
         let key = TunnelSessionKey::new(node_uuid, sid);
@@ -118,7 +118,7 @@ impl AppState {
         };
 
         connection.tx.send(frame).await.map_err(|err| {
-            return format!("failed to send frame to client {cid}: {err}");
+            format!("failed to send frame to client {cid}: {err}")
         })?;
 
         debug!("frame sent to web client {cid}");

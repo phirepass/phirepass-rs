@@ -216,12 +216,13 @@ async fn handle_node_socket(socket: WebSocket, state: AppState, ip: IpAddr) {
     if let Err(err) = state
         .memory_db
         .set_node_connected(&node_record, &state.server)
+        .await
     {
         warn!("failed to update node {node_id} as connected in postgres: {err}");
     }
 
     {
-        let server_id = state.id.as_ref().clone();
+        let server_id = *state.id.as_ref();
         state.nodes.insert(
             node_id,
             NodeConnection::new(server_id, ip, tx.clone(), node_record),
@@ -299,7 +300,7 @@ async fn handle_node_messages(
 
                 match node_frame {
                     NodeFrameData::Heartbeat { stats } => {
-                        if let Err(err) = handle_node_heartbeat(&state, &node_id, Some(stats)).await
+                        if let Err(err) = handle_node_heartbeat(state, &node_id, Some(stats)).await
                         {
                             warn!("failed to update node heartbeat: {err}");
                             break; // cleanup handled by caller
@@ -321,11 +322,11 @@ async fn handle_node_messages(
                         sid,
                         msg_id,
                     } => {
-                        handle_tunnel_opened(&state, protocol, cid, sid, &node_id, msg_id).await;
+                        handle_tunnel_opened(state, protocol, cid, sid, &node_id, msg_id).await;
                     }
                     // agent notified server with data for web
                     NodeFrameData::WebFrame { .. } => {
-                        handle_frame_response(&state, node_frame, node_id).await;
+                        handle_frame_response(state, node_frame, node_id).await;
                     }
                     // agent notified server with data for web
                     NodeFrameData::TunnelClosed {
@@ -334,7 +335,7 @@ async fn handle_node_messages(
                         sid,
                         msg_id,
                     } => {
-                        handle_tunnel_closed(&state, protocol, cid, sid, &node_id, msg_id).await;
+                        handle_tunnel_closed(state, protocol, cid, sid, &node_id, msg_id).await;
                     }
                     o => warn!("unhandled node frame: {o:?}"),
                 }
@@ -377,9 +378,9 @@ async fn handle_frame_response(state: &AppState, node_frame: NodeFrameData, node
         },
     };
 
-    match state.notify_client_by_cid(cid, frame).await {
-        Ok(_) => debug!("forwarded tunnel data to node {node_id} for client {cid}"),
-        Err(_) => {} // Error already logged in notify_client_by_cid
+    if state.notify_client_by_cid(cid, frame).await.is_ok() {
+        debug!("forwarded tunnel data to node {node_id} for client {cid}")
+        // Error already logged in notify_client_by_cid
     }
 }
 
@@ -396,7 +397,7 @@ async fn handle_tunnel_closed(
     let key = crate::http::TunnelSessionKey::new(*node_id, sid);
     state.tunnel_sessions.remove(&key);
 
-    match state
+    if state
         .notify_client_by_cid(
             cid,
             WebFrameData::TunnelClosed {
@@ -406,9 +407,10 @@ async fn handle_tunnel_closed(
             },
         )
         .await
+        .is_ok()
     {
-        Ok(..) => info!("tunnel closed notification sent to web client {cid}"),
-        Err(_) => {} // Error already logged in notify_client_by_cid
+        info!("tunnel closed notification sent to web client {cid}")
+        // Error already logged in notify_client_by_cid
     }
 }
 
@@ -425,7 +427,7 @@ async fn handle_tunnel_opened(
     let key = crate::http::TunnelSessionKey::new(*node_id, sid);
     state.tunnel_sessions.insert(key, (cid, *node_id));
 
-    match state
+    if state
         .notify_client_by_cid(
             cid,
             WebFrameData::TunnelOpened {
@@ -435,9 +437,10 @@ async fn handle_tunnel_opened(
             },
         )
         .await
+        .is_ok()
     {
-        Ok(..) => info!("tunnel opened notification sent to web client {cid}"),
-        Err(_) => {} // Error already logged in notify_client_by_cid
+        info!("tunnel opened notification sent to web client {cid}")
+        // Error already logged in notify_client_by_cid
     }
 }
 
@@ -450,7 +453,7 @@ async fn disconnect_node(state: &AppState, id: &Uuid) {
             info.node.ip, alive, total
         );
 
-        if let Err(err) = state.memory_db.set_node_disconnected(&info.node_record) {
+        if let Err(err) = state.memory_db.set_node_disconnected(&info.node_record).await {
             warn!("failed to update node {id} as disconnected in postgres: {err}");
         }
 
@@ -466,13 +469,13 @@ async fn notify_all_clients_for_closed_tunnel(state: &AppState, id: &Uuid) -> u3
         .tunnel_sessions
         .iter()
         .filter(|entry| entry.key().node_id == *id)
-        .map(|entry| (entry.key().clone(), entry.value().clone()))
+        .map(|entry| (*entry.key(), *entry.value()))
         .collect();
 
     for (key, (cid, _)) in sessions_to_close {
         state.tunnel_sessions.remove(&key);
 
-        if let Ok(_) = state
+        if state
             .notify_client_by_cid(
                 cid,
                 WebFrameData::TunnelClosed {
@@ -482,6 +485,7 @@ async fn notify_all_clients_for_closed_tunnel(state: &AppState, id: &Uuid) -> u3
                 },
             )
             .await
+            .is_ok()
         {
             count += 1;
             info!("tunnel closed notification sent to web client {cid} due to node disconnect");
@@ -515,6 +519,7 @@ async fn handle_node_heartbeat(
         state
             .memory_db
             .update_node_stats(&info.node_record, &state.server, extended_stats)
+            .await
     {
         warn!("failed to update node stats for node {node_id}: {err}");
         return Ok(());
@@ -626,13 +631,13 @@ async fn validate_creds(
 
     debug!("token record {} found", token_record.id);
 
-    if let Some(expires_at) = token_record.expires_at {
-        if expires_at < Utc::now() {
-            warn!("token {} expired: {:?}", token_id, token_record.expires_at);
-            return Err(CredentialValidationError::Unauthorized(
-                "token has expired".to_string(),
-            ));
-        }
+    if let Some(expires_at) = token_record.expires_at
+        && expires_at < Utc::now()
+    {
+        warn!("token {} expired: {:?}", token_id, token_record.expires_at);
+        return Err(CredentialValidationError::Unauthorized(
+            "token has expired".to_string(),
+        ));
     }
 
     debug!("token is still valid");
@@ -747,14 +752,13 @@ pub async fn claim_node(
                 "error": "failed to check node claim",
             }));
         }
-    } {
-        if existing.user_id != token.user_id {
-            return unauthorized(json!({
-                "success": false,
-                "code": "CLAIM_PUBLIC_KEY_OWNERSHIP_CONFLICT",
-                "error": "public key already claimed by another user",
-            }));
-        }
+    } && existing.user_id != token.user_id
+    {
+        return unauthorized(json!({
+            "success": false,
+            "code": "CLAIM_PUBLIC_KEY_OWNERSHIP_CONFLICT",
+            "error": "public key already claimed by another user",
+        }));
     }
 
     let node = match state

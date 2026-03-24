@@ -43,11 +43,11 @@ pub(crate) struct WebSocketConnection {
     downloads: SFTPActiveDownloads,
 }
 
-fn generate_server_endpoint(mode: &Mode, server_host: &String, server_port: u16) -> String {
+fn generate_server_endpoint(mode: &Mode, server_host: &str, server_port: u16) -> String {
     let server_host = server_host
         .split_once("://")
         .map(|(_, rest)| rest)
-        .unwrap_or(server_host.as_str());
+        .unwrap_or(server_host);
 
     match mode {
         Mode::Development => {
@@ -95,7 +95,7 @@ impl WebSocketConnection {
         let (stream, _) = connect_async(endpoint).await?;
         let (mut write, mut read) = stream.split();
 
-        let node_id = self.node_id.clone();
+        let node_id = self.node_id;
         let token = self.token.expose_secret().to_owned();
 
         let frame: Frame = NodeFrameData::Auth {
@@ -405,7 +405,7 @@ async fn handle_message(
         } => {
             info!("received open tunnel with protocol {protocol}");
 
-            if let Err(err) = ensure_credentials(sender, &config, cid, &username, &password, msg_id)
+            if let Err(err) = ensure_credentials(sender, config, cid, &username, &password, msg_id)
             {
                 warn!("credentials verification error: {err}");
                 return;
@@ -882,6 +882,7 @@ fn ensure_credentials(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_sftp_tunnel(
     tx: &Sender<Frame>,
     cid: Uuid,
