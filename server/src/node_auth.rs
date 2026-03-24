@@ -368,7 +368,7 @@ fn extract_bearer_token(headers: &axum::http::HeaderMap) -> anyhow::Result<Strin
 mod tests {
     use super::*;
     use axum::http::HeaderMap;
-    use ed25519_dalek::{SigningKey, Signer};
+    use ed25519_dalek::{Signer, SigningKey};
     use rand::rngs::OsRng;
 
     fn test_env(jwt_ttl_secs: i64) -> Env {
@@ -491,10 +491,12 @@ mod tests {
     fn invalid_public_key_encoding_returns_error() {
         let result = verify_signature("not-valid-base64!!!", "challenge", "signature");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("invalid public key encoding"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("invalid public key encoding")
+        );
     }
 
     #[test]
@@ -555,10 +557,12 @@ mod tests {
         let headers = HeaderMap::new();
         let result = extract_bearer_token(&headers);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("missing authorization header"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("missing authorization header")
+        );
     }
 
     #[test]
@@ -571,10 +575,12 @@ mod tests {
 
         let result = extract_bearer_token(&headers);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("expected Bearer token"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("expected Bearer token")
+        );
     }
 
     #[test]
@@ -587,9 +593,11 @@ mod tests {
 
         let result = extract_bearer_token(&headers);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("bearer token is empty"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("bearer token is empty")
+        );
     }
 }

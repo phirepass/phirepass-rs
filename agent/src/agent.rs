@@ -26,13 +26,15 @@ use uuid::Uuid;
 pub(crate) async fn start(config: Env) -> anyhow::Result<()> {
     info!("running server on {} mode", config.mode);
 
+    let host = config.host.clone();
     let stats_refresh_interval = config.stats_refresh_interval;
     let (shutdown_tx, _) = broadcast::channel(1);
 
     let state = AppState::new(Arc::new(config));
     let ws_task = start_ws_connection(&state, shutdown_tx.subscribe());
     let http_task = start_http_server(state, shutdown_tx.subscribe());
-    let stats_task = spawn_stats_logger(stats_refresh_interval as u64, shutdown_tx.subscribe());
+    let stats_task =
+        spawn_stats_logger(host, stats_refresh_interval as u64, shutdown_tx.subscribe());
 
     let shutdown_signal = async {
         if let Err(err) = signal::ctrl_c().await {
@@ -299,7 +301,7 @@ async fn bootstrap_identity(
     let username = whoami::username()?;
     let ts = TokenStore::new("phirepass", "agent", server_host)?;
 
-    // Reuse existing identity for the same server so relogin does not create stale node rows.
+    // Reuse existing identity for the same server, so relogin does not create stale node rows.
     let identity = match ts.load() {
         Ok(stored) => {
             info!("reusing existing local node identity for {}", server_host);
@@ -428,6 +430,7 @@ async fn parse_json_response<T: for<'de> Deserialize<'de>>(
 }
 
 fn spawn_stats_logger(
+    host: String,
     stats_refresh_interval: u64,
     mut shutdown: broadcast::Receiver<()>,
 ) -> tokio::task::JoinHandle<()> {
@@ -439,7 +442,7 @@ fn spawn_stats_logger(
                     // Stats::refresh() calls blocking syscalls (sysinfo, netstat). Use
                     // block_in_place so the async runtime's worker threads are not installed.
                     match tokio::task::block_in_place(Stats::refresh) {
-                        Some(stats) => info!("agent stats\n{}", stats.log_line()),
+                        Some(stats) => info!("agent[hostname={}] stats\n{}", host, stats.log_line()),
                         None => warn!("stats: unable to read process metrics"),
                     }
                 }

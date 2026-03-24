@@ -63,7 +63,10 @@ impl WsProxy {
 
         let server = ServerIdentifier::get_decoded(server_str)?;
 
-        info!("server found: {} {} {} {}", server.id, server.fqdn, server.private_ip, server.port);
+        info!(
+            "server found: {} {} {} {}",
+            server.id, server.fqdn, server.private_ip, server.port
+        );
 
         Ok(server)
     }

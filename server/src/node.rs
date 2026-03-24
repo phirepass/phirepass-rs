@@ -20,6 +20,7 @@ use phirepass_common::protocol::common::{Frame, FrameData};
 use phirepass_common::protocol::node::{NodeFrameData, WebFrameId};
 use phirepass_common::protocol::web::WebFrameData;
 use phirepass_common::stats::Stats;
+use phirepass_common::time::now_millis;
 use phirepass_common::token::extract_creds;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,7 +30,6 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::mpsc;
 use uuid::Uuid;
-use phirepass_common::time::now_millis;
 
 pub(crate) async fn ws_node_handler(
     State(state): State<AppState>,
@@ -300,7 +300,8 @@ async fn handle_node_messages(
 
                 match node_frame {
                     NodeFrameData::Heartbeat { stats, sent_at } => {
-                        if let Err(err) = handle_node_heartbeat(state, &node_id, stats, sent_at).await
+                        if let Err(err) =
+                            handle_node_heartbeat(state, &node_id, stats, sent_at).await
                         {
                             warn!("failed to update node heartbeat: {err}");
                             break; // cleanup handled by caller
@@ -437,7 +438,11 @@ async fn disconnect_node(state: &AppState, id: &Uuid) {
             info.node.ip, alive, total
         );
 
-        if let Err(err) = state.memory_db.set_node_disconnected(&info.node_record).await {
+        if let Err(err) = state
+            .memory_db
+            .set_node_disconnected(&info.node_record)
+            .await
+        {
             warn!("failed to update node {id} as disconnected in postgres: {err}");
         }
 
@@ -498,11 +503,10 @@ async fn handle_node_heartbeat(
         return Ok(());
     };
 
-    if let Err(err) =
-        state
-            .memory_db
-            .update_node_stats(&info.node_record, &state.server, extended_stats)
-            .await
+    if let Err(err) = state
+        .memory_db
+        .update_node_stats(&info.node_record, &state.server, extended_stats)
+        .await
     {
         warn!("failed to update node stats for node {node_id}: {err}");
         return Ok(());

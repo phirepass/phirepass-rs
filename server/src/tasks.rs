@@ -115,7 +115,7 @@ pub(crate) async fn keep_server_alive_task(state: &AppState) {
 }
 
 pub(crate) fn print_server_stats_task(state: &AppState) {
-    info!("printing server stats");
+    info!("printing server[id={}] stats", state.server.id);
 
     info!("\tactive web connections: {}", state.connections.len());
     info!("\tactive nodes connections: {}", state.nodes.len());
@@ -124,7 +124,7 @@ pub(crate) fn print_server_stats_task(state: &AppState) {
         // Stats::refresh() calls blocking syscalls (sysinfo, netstat). Use
         // block_in_place so the async runtime's worker threads are not installed.
         match tokio::task::block_in_place(Stats::refresh) {
-            Some(stats) => info!("server stats\n{}", stats.log_line()),
+            Some(stats) => info!("server[id={}] stats\n{}", state.server.id, stats.log_line()),
             None => warn!("stats: unable to read process metrics"),
         }
     }

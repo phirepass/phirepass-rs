@@ -268,9 +268,7 @@ pub async fn download_file_chunk(
     }
 
     // Remove the download entry if EOF or error was encountered
-    if should_remove
-        && let Some((_, file_download)) = downloads.remove(&key)
-    {
+    if should_remove && let Some((_, file_download)) = downloads.remove(&key) {
         debug!("closed sftp file for download: {}", file_download.filename);
         // FileDownload is dropped here, closing the sftp_file
     }

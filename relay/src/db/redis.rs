@@ -1,9 +1,9 @@
-use redis::AsyncCommands;
 use crate::env::Env;
-use log::{debug, warn};
 use anyhow::Context;
-use redis::aio::ConnectionManager;
 use futures_util::StreamExt;
+use log::{debug, warn};
+use redis::AsyncCommands;
+use redis::aio::ConnectionManager;
 
 pub struct MemoryDB {
     // ConnectionManager is Arc-internally inexpensive to clone and is the recommended way
