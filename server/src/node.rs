@@ -248,13 +248,13 @@ async fn handle_node_socket(socket: WebSocket, state: AppState, ip: IpAddr) {
         }
     });
 
-    // Handle messages in separate function to ensure cleanup always happens
+    // Handle messages in a separate function to ensure cleanup always happens
     handle_node_messages(&mut ws_rx, &state, node_id, &tx).await;
 
-    // Always abort write task regardless of how we exited message loop
-    drop(tx); // Close sender first to wake write task
+    // Always abort a write task regardless of how we exited the message loop
+    drop(tx); // Close sender first to wake a write task
     write_task.abort();
-    disconnect_node(&state, node_id).await;
+    disconnect_node(&state, &node_id).await;
 }
 
 /// Handles incoming WebSocket messages. Always returns to parent for cleanup.
@@ -269,7 +269,7 @@ async fn handle_node_messages(
             Ok(msg) => msg,
             Err(err) => {
                 warn!("node web socket error: {err}");
-                disconnect_node(&state, node_id).await;
+                disconnect_node(&state, &node_id).await;
                 return;
             }
         };
@@ -434,8 +434,8 @@ async fn handle_tunnel_opened(
     }
 }
 
-async fn disconnect_node(state: &AppState, id: Uuid) {
-    if let Some((_, info)) = state.nodes.remove(&id) {
+async fn disconnect_node(state: &AppState, id: &Uuid) {
+    if let Some((_, info)) = state.nodes.remove(id) {
         let alive = info.node.connected_at.elapsed();
         let mut total = state.nodes.len() as u32;
         info!(
@@ -452,13 +452,13 @@ async fn disconnect_node(state: &AppState, id: Uuid) {
     }
 }
 
-async fn notify_all_clients_for_closed_tunnel(state: &AppState, id: Uuid) -> u32 {
+async fn notify_all_clients_for_closed_tunnel(state: &AppState, id: &Uuid) -> u32 {
     let mut count = 0u32;
 
     let sessions_to_close: Vec<_> = state
         .tunnel_sessions
         .iter()
-        .filter(|entry| entry.key().node_id == id)
+        .filter(|entry| entry.key().node_id == *id)
         .map(|entry| (entry.key().clone(), entry.value().clone()))
         .collect();
 
@@ -489,6 +489,7 @@ async fn update_node_heartbeat(state: &AppState, node_id: &Uuid, stats: Option<S
         Some(info) => info,
         None => {
             warn!("node {node_id} not found");
+            disconnect_node(&state, node_id).await;
             return;
         }
     };
@@ -555,19 +556,19 @@ fn default_metadata() -> Value {
     Value::Object(Default::default())
 }
 
-fn unauthorized(value: serde_json::Value) -> Response {
+fn unauthorized(value: Value) -> Response {
     (StatusCode::UNAUTHORIZED, Json(value)).into_response()
 }
 
-fn bad_request(value: serde_json::Value) -> Response {
+fn bad_request(value: Value) -> Response {
     (StatusCode::BAD_REQUEST, Json(value)).into_response()
 }
 
-fn internal_error(value: serde_json::Value) -> Response {
+fn internal_error(value: Value) -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, Json(value)).into_response()
 }
 
-fn success(value: serde_json::Value) -> Response {
+fn success(value: Value) -> Response {
     (StatusCode::OK, Json(value)).into_response()
 }
 
