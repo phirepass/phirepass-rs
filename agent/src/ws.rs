@@ -148,30 +148,26 @@ impl WebSocketConnection {
             Arc::clone(&self.sessions),
             Arc::clone(&self.uploads),
             Arc::clone(&self.downloads),
-        )
-        .await;
+        );
 
         let cancellation_token = CancellationToken::new();
         let heartbeat_task = spawn_heartbeat_task(
             self.writer.clone(),
             config.stats_refresh_interval as u64,
             cancellation_token.clone(),
-        )
-        .await;
+        );
 
         let ping_task = spawn_ping_task(
             self.writer.clone(),
             config.ping_interval as u64,
             cancellation_token.clone(),
-        )
-        .await;
+        );
 
         let cleanup_task = spawn_cleanup_task(
             self.uploads.clone(),
             self.downloads.clone(),
             cancellation_token.clone(),
-        )
-        .await;
+        );
 
         tokio::select! {
             _ = ping_task => warn!("ping task ended"),
@@ -215,7 +211,7 @@ impl WebSocketConnection {
     }
 }
 
-async fn spawn_cleanup_task(
+fn spawn_cleanup_task(
     uploads: SFTPActiveUploads,
     downloads: SFTPActiveDownloads,
     token: CancellationToken,
@@ -239,7 +235,7 @@ async fn spawn_cleanup_task(
     })
 }
 
-async fn spawn_reader_task(
+fn spawn_reader_task(
     target: Uuid,
     mut reader: WebSocketReader,
     sender: Sender<Frame>,
@@ -286,7 +282,7 @@ async fn spawn_reader_task(
     })
 }
 
-async fn spawn_ping_task(
+fn spawn_ping_task(
     sender: Sender<Frame>,
     interval: u64,
     cancellation_token: CancellationToken,
@@ -308,7 +304,7 @@ async fn spawn_ping_task(
     })
 }
 
-async fn spawn_heartbeat_task(
+fn spawn_heartbeat_task(
     sender: Sender<Frame>,
     interval: u64,
     cancellation_token: CancellationToken,
