@@ -89,6 +89,7 @@ impl SFTPConnection {
         Ok(client_handler)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn connect(
         &self,
         cid: Uuid,
@@ -103,7 +104,7 @@ impl SFTPConnection {
         let sid = self.get_session_id();
 
         send_frame_data(
-            &tx,
+            tx,
             NodeFrameData::TunnelOpened {
                 protocol: Protocol::SFTP as u8,
                 cid,

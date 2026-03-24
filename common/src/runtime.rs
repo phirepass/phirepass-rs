@@ -26,17 +26,15 @@ impl RuntimeBuilder {
             }
         };
 
-        if flavor != "current_thread" {
-            if let Some(worker_threads) = worker_threads {
-                builder.worker_threads(worker_threads);
-            }
+        if flavor != "current_thread"
+            && let Some(worker_threads) = worker_threads
+        {
+            builder.worker_threads(worker_threads);
         }
 
         builder
             .max_blocking_threads(max_blocking_threads)
             .enable_all();
-
-        builder.build().expect("failed to build Tokio runtime");
 
         Self { inner: builder }
     }

@@ -107,11 +107,11 @@ async fn wait_for_auth(
 
             // to enable local dev
             if !cfg!(debug_assertions) {
-                let claims = validate_jwt(tx, state, &token, cid.clone(), msg_id.clone()).await?;
-                validate_user_node(tx, state, claims, node_id, cid.clone(), msg_id).await?;
+                let claims = validate_jwt(tx, state, &token, cid, msg_id).await?;
+                validate_user_node(tx, state, claims, node_id, cid, msg_id).await?;
             }
 
-            successful_auth(tx, cid.clone(), version, msg_id).await?;
+            successful_auth(tx, cid, version, msg_id).await?;
 
             Ok(cid)
         }
@@ -293,7 +293,7 @@ async fn handle_web_messages(
         let msg = match msg {
             Ok(msg) => msg,
             Err(_) => {
-                disconnect_web_client(&state, &cid).await;
+                disconnect_web_client(state, &cid).await;
                 return;
             }
         };
@@ -318,7 +318,7 @@ async fn handle_web_messages(
 
                 match web_frame {
                     WebFrameData::Heartbeat => {
-                        update_web_heartbeat(&state, &cid).await;
+                        update_web_heartbeat(state, &cid).await;
                     }
                     WebFrameData::Auth { .. } => {
                         // auth already handled before.
@@ -341,7 +341,7 @@ async fn handle_web_messages(
                         password,
                     } => {
                         handle_web_open_tunnel(
-                            &state, cid, protocol, target, msg_id, username, password,
+                            state, cid, protocol, target, msg_id, username, password,
                         )
                         .await;
                     }
@@ -355,7 +355,7 @@ async fn handle_web_messages(
                         node_id,
                         data,
                     } => {
-                        handle_web_tunnel_data(&state, cid, protocol, sid, node_id, data).await;
+                        handle_web_tunnel_data(state, cid, protocol, sid, node_id, data).await;
                     }
                     WebFrameData::TunnelClosed { .. } => {
                         warn!(
@@ -369,7 +369,7 @@ async fn handle_web_messages(
                         cols,
                         rows,
                     } => {
-                        handle_web_resize(&state, cid, sid, node_id, cols, rows).await;
+                        handle_web_resize(state, cid, sid, node_id, cols, rows).await;
                     }
                     WebFrameData::SFTPList {
                         path,
@@ -377,7 +377,7 @@ async fn handle_web_messages(
                         node_id,
                         msg_id,
                     } => {
-                        handle_sftp_list(&state, cid, sid, node_id, path, msg_id).await;
+                        handle_sftp_list(state, cid, sid, node_id, path, msg_id).await;
                     }
                     WebFrameData::SFTPDownloadStart {
                         sid,
@@ -385,7 +385,7 @@ async fn handle_web_messages(
                         msg_id,
                         download,
                     } => {
-                        handle_sftp_download_start(&state, cid, sid, node_id, msg_id, download)
+                        handle_sftp_download_start(state, cid, sid, node_id, msg_id, download)
                             .await;
                     }
                     WebFrameData::SFTPDownloadChunkRequest {
@@ -396,7 +396,7 @@ async fn handle_web_messages(
                         chunk_index,
                     } => {
                         handle_sftp_download_chunk_request(
-                            &state,
+                            state,
                             cid,
                             sid,
                             node_id,
@@ -419,7 +419,7 @@ async fn handle_web_messages(
                         msg_id,
                         upload,
                     } => {
-                        handle_sftp_upload_start(&state, cid, sid, node_id, msg_id, upload).await;
+                        handle_sftp_upload_start(state, cid, sid, node_id, msg_id, upload).await;
                     }
                     WebFrameData::SFTPUpload {
                         sid,
@@ -427,7 +427,7 @@ async fn handle_web_messages(
                         msg_id,
                         chunk,
                     } => {
-                        handle_sftp_upload(&state, cid, sid, node_id, msg_id, chunk).await;
+                        handle_sftp_upload(state, cid, sid, node_id, msg_id, chunk).await;
                     }
                     WebFrameData::SFTPDelete {
                         sid,
@@ -435,7 +435,7 @@ async fn handle_web_messages(
                         msg_id,
                         data,
                     } => {
-                        handle_sftp_delete(&state, cid, sid, node_id, msg_id, data).await;
+                        handle_sftp_delete(state, cid, sid, node_id, msg_id, data).await;
                     }
                     WebFrameData::SFTPListItems { .. } => {
                         warn!("received sftp list items which is invalid if sent by web client");

@@ -77,25 +77,26 @@ pub async fn create_auth_challenge(
         }
     };
 
-    if let Some(node) = maybe_node {
-        if !node.revoked {
-            let expires_at = Utc::now() + Duration::seconds(state.env.challenge_ttl_secs);
+    if let Some(node) = maybe_node
+        && !node.revoked
+    {
+        let expires_at = Utc::now() + Duration::seconds(state.env.challenge_ttl_secs);
 
-            if let Err(_) = state
-                .db
-                .upsert_auth_challenge(&node.id, &challenge, expires_at)
-                .await
-            {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({
-                        "success": false,
-                        "code": "CHALLENGE_WRITE_FAILED",
-                        "error": "failed to create challenge"
-                    })),
-                )
-                    .into_response();
-            }
+        if state
+            .db
+            .upsert_auth_challenge(&node.id, &challenge, expires_at)
+            .await
+            .is_err()
+        {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "success": false,
+                    "code": "CHALLENGE_WRITE_FAILED",
+                    "error": "failed to create challenge"
+                })),
+            )
+                .into_response();
         }
     }
 

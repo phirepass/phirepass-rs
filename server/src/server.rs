@@ -50,7 +50,7 @@ pub async fn start(config: Env) -> anyhow::Result<()> {
     let memory_db = MemoryDB::create(&config)?;
     info!("connected to valkey");
 
-    let server_identifier = create_server_identifier(&config, id.clone())?;
+    let server_identifier = create_server_identifier(&config, id)?;
     info!("server identifier: {:?}", server_identifier);
 
     let state = AppState {

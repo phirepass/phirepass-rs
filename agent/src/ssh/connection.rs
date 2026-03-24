@@ -99,7 +99,7 @@ impl SSHConnection {
         let sid = self.get_session_id();
 
         send_frame_data(
-            &tx,
+            tx,
             NodeFrameData::TunnelOpened {
                 protocol: Protocol::SSH as u8,
                 cid,
