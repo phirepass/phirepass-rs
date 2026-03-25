@@ -21,6 +21,7 @@ use phirepass_common::stats::Stats;
 use phirepass_common::time::now_millis;
 use secrecy::{ExposeSecret, SecretString};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
@@ -129,6 +130,9 @@ impl WebSocketConnection {
             version
         );
 
+        let last_heartbeat = Arc::new(AtomicU64::new(0));
+        let cancellation_token = CancellationToken::new();
+
         let mut rx = self.reader;
         let write_task = tokio::spawn(async move {
             while let Some(frame) = rx.recv().await {
@@ -148,13 +152,14 @@ impl WebSocketConnection {
             Arc::clone(&self.sessions),
             Arc::clone(&self.uploads),
             Arc::clone(&self.downloads),
+            last_heartbeat.clone(),
         );
 
-        let cancellation_token = CancellationToken::new();
         let heartbeat_task = spawn_heartbeat_task(
             self.writer.clone(),
             config.stats_refresh_interval as u64,
             cancellation_token.clone(),
+            last_heartbeat.clone(),
         );
 
         let cleanup_task = spawn_cleanup_task(
@@ -168,6 +173,7 @@ impl WebSocketConnection {
             _ = reader_task => warn!("read task ended"),
             _ = heartbeat_task => warn!("heartbeat task ended"),
             _ = cleanup_task => warn!("cleanup task ended"),
+            _ = cancellation_token.cancelled() => warn!("cancellation token triggered"),
         }
 
         // Cancel background tasks to prevent them from trying to send on a closed channel
@@ -236,6 +242,7 @@ fn spawn_reader_task(
     sessions: TunnelSessions,
     uploads: SFTPActiveUploads,
     downloads: SFTPActiveDownloads,
+    last_heartbeat: Arc<AtomicU64>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(frame) = reader.next().await {
@@ -260,7 +267,14 @@ fn spawn_reader_task(
                     debug!("received node frame: {data:?}");
 
                     handle_message(
-                        target, data, &sender, &config, &sessions, &uploads, &downloads,
+                        target,
+                        data,
+                        &sender,
+                        &config,
+                        &sessions,
+                        &uploads,
+                        &downloads,
+                        Arc::clone(&last_heartbeat),
                     )
                     .await;
                 }
@@ -279,16 +293,29 @@ fn spawn_heartbeat_task(
     sender: Sender<Frame>,
     interval: u64,
     cancellation_token: CancellationToken,
+    last_heartbeat: Arc<AtomicU64>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(interval));
+        let timeout_ms = (interval.period().as_millis() * 3) as u64;
+
         loop {
             tokio::select! {
                 _ = interval.tick() => {
+                    let now = now_millis();
+                    let last = last_heartbeat.load(Ordering::Relaxed);
+
+                    if last > 0 && now.saturating_sub(last) > timeout_ms {
+                        warn!("heartbeat timeout: last heartbeat received {}ms ago", now.saturating_sub(last));
+                        cancellation_token.cancel();
+                        break;
+                    }
+
                     let Some(stats) = Stats::get() else {
                         warn!("failed to get stats for heartbeat");
                         continue;
                     };
+
                     let sent_at = now_millis();
                     send_frame_data(&sender, NodeFrameData::Heartbeat { stats, sent_at });
                 }
@@ -360,6 +387,7 @@ async fn handle_message(
     sessions: &TunnelSessions,
     uploads: &SFTPActiveUploads,
     downloads: &SFTPActiveDownloads,
+    last_heartbeat: Arc<AtomicU64>,
 ) {
     debug!("handling message: {data:?}");
 
@@ -413,6 +441,15 @@ async fn handle_message(
                 }
                 Err(err) => warn!("invalid protocol value {protocol}: {err:?}"),
             }
+        }
+        NodeFrameData::HeartbeatAck {
+            sent_at,
+            received_at: _,
+        } => {
+            let now = now_millis();
+            last_heartbeat.store(now, Ordering::Relaxed);
+            let latency = now.saturating_sub(sent_at);
+            debug!("heartbeat ack received, latency: {latency}ms");
         }
         NodeFrameData::ConnectionDisconnect { cid } => {
             info!("received connection disconnect for {cid}");
@@ -1005,6 +1042,7 @@ async fn start_ssh_tunnel(
     });
 
     info!("ssh session handle {sid} created");
+    info!("total ssh sessions {}", sessions.len() + 1);
 
     let previous = sessions.insert((cid, sid), handle);
 

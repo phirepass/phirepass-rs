@@ -21,6 +21,11 @@ pub enum NodeFrameData {
         sent_at: u64,
     },
 
+    HeartbeatAck {
+        sent_at: u64,
+        received_at: u64,
+    },
+
     /// agent has already logged in and acquired a token and a node_id,
     /// and it sends this request to validate
     Auth {
@@ -136,6 +141,7 @@ impl NodeFrameData {
     pub fn code(&self) -> u8 {
         match self {
             NodeFrameData::Heartbeat { .. } => 1,
+            NodeFrameData::HeartbeatAck { .. } => 2,
             NodeFrameData::Auth { .. } => 10,
             NodeFrameData::AuthResponse { .. } => 11,
             NodeFrameData::OpenTunnel { .. } => 20,

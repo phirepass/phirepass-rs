@@ -498,6 +498,14 @@ async fn handle_node_heartbeat(
     let now = now_millis();
     let latency = now.saturating_sub(sent_at);
 
+    let _ = info
+        .tx
+        .send(NodeFrameData::HeartbeatAck {
+            sent_at,
+            received_at: now,
+        })
+        .await;
+
     let Ok(extended_stats) = info.get_extended_stats(latency) else {
         warn!("failed to encode stats");
         return Ok(());
