@@ -234,12 +234,22 @@ impl Channel {
         });
     }
 
-    pub fn send_ssh_terminal_resize(&self, node_id: String, sid: u32, cols: u32, rows: u32) {
+    pub fn send_ssh_terminal_resize(
+        &self,
+        node_id: String,
+        sid: u32,
+        cols: u32,
+        rows: u32,
+        px_width: u32,
+        px_height: u32,
+    ) {
         self.send_frame_data(WebFrameData::SSHWindowResize {
             node_id,
             sid,
             cols,
             rows,
+            px_width,
+            px_height,
         });
     }
 

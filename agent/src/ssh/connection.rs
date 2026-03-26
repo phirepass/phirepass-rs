@@ -147,8 +147,8 @@ impl SSHConnection {
                                 break;
                             }
                         }
-                        SSHCommand::Resize { cols, rows } => {
-                            if let Err(err) = channel.window_change(cols, rows, 0, 0).await {
+                        SSHCommand::Resize { cols, rows, px_width, px_height, } => {
+                            if let Err(err) = channel.window_change(cols, rows, px_width, px_height).await {
                                 warn!("failed to resize ssh channel {cid}: {err}");
                             }
                         }

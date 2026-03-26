@@ -75,6 +75,8 @@ pub enum NodeFrameData {
         sid: u32,
         cols: u32,
         rows: u32,
+        px_width: u32,
+        px_height: u32,
     },
 
     SFTPList {

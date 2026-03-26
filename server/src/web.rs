@@ -370,8 +370,13 @@ async fn handle_web_messages(
                         sid,
                         cols,
                         rows,
+                        px_width,
+                        px_height,
                     } => {
-                        handle_web_resize(state, cid, sid, node_id, cols, rows).await;
+                        handle_web_resize(
+                            state, cid, sid, node_id, cols, rows, px_width, px_height,
+                        )
+                        .await;
                     }
                     WebFrameData::SFTPList {
                         path,
@@ -801,6 +806,8 @@ async fn handle_web_resize(
     target: String,
     cols: u32,
     rows: u32,
+    px_width: u32,
+    px_height: u32,
 ) {
     debug!("tunnel ssh resize received");
 
@@ -825,6 +832,8 @@ async fn handle_web_resize(
             sid,
             cols,
             rows,
+            px_width,
+            px_height,
         })
         .await
     {

@@ -462,8 +462,12 @@ async fn handle_message(
             sid,
             cols,
             rows,
+            px_width,
+            px_height,
         } => {
-            if let Err(err) = send_ssh_forward_resize(cid, sid, cols, rows, sessions).await {
+            if let Err(err) =
+                send_ssh_forward_resize(cid, sid, cols, rows, px_width, px_height, sessions).await
+            {
                 warn!("failed to forward resize: {err}");
             }
         }
@@ -765,6 +769,8 @@ async fn send_ssh_forward_resize(
     sid: u32,
     cols: u32,
     rows: u32,
+    px_width: u32,
+    px_height: u32,
     sessions: &TunnelSessions,
 ) -> anyhow::Result<()> {
     let stdin = sessions.get(&(cid, sid)).map(|s| s.get_stdin());
@@ -778,7 +784,12 @@ async fn send_ssh_forward_resize(
     };
 
     stdin
-        .send(SSHCommand::Resize { cols, rows })
+        .send(SSHCommand::Resize {
+            cols,
+            rows,
+            px_width,
+            px_height,
+        })
         .await
         .map_err(|err| anyhow!(err))
 }

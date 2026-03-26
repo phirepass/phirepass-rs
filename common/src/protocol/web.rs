@@ -62,6 +62,8 @@ pub enum WebFrameData {
         sid: u32,
         cols: u32,
         rows: u32,
+        px_width: u32,
+        px_height: u32,
     }, // resize a tunnel's pty (only for the SSH tunnel) - request sent from web to server
 
     SFTPList {

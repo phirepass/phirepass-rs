@@ -6,7 +6,12 @@ use tokio::sync::oneshot;
 #[derive(Clone, Debug)]
 pub(crate) enum SSHCommand {
     Data(Bytes),
-    Resize { cols: u32, rows: u32 },
+    Resize {
+        cols: u32,
+        rows: u32,
+        px_width: u32,
+        px_height: u32,
+    },
 }
 
 #[derive(Debug)]
