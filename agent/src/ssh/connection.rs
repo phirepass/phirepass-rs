@@ -98,16 +98,6 @@ impl SSHConnection {
 
         let sid = self.get_session_id();
 
-        send_frame_data(
-            tx,
-            NodeFrameData::TunnelOpened {
-                protocol: Protocol::SSH as u8,
-                cid,
-                sid,
-                msg_id,
-            },
-        );
-
         let client = self
             .create_client()
             .await
@@ -121,13 +111,24 @@ impl SSHConnection {
             .map_err(|e| (WebFrameId::SessionId(sid), AgentError::Russh(e)))?;
 
         channel
-            .request_pty(true, "xterm-256color", 80, 24, 0, 0, &[])
+            .request_pty(true, "xterm-256color", 80, 24, 600, 400, &[])
             .await
             .map_err(|e| (WebFrameId::SessionId(sid), AgentError::Russh(e)))?;
+
         channel
             .request_shell(true)
             .await
             .map_err(|e| (WebFrameId::SessionId(sid), AgentError::Russh(e)))?;
+
+        send_frame_data(
+            tx,
+            NodeFrameData::TunnelOpened {
+                protocol: Protocol::SSH as u8,
+                cid,
+                sid,
+                msg_id,
+            },
+        );
 
         info!("ssh[id={sid}] tunnel opened");
 
